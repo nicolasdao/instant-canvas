@@ -38,6 +38,34 @@ const state = {
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
+// Lucide icons (lucide.dev, ISC license) — vendored path data, stroke = currentColor.
+const LUCIDE = {
+	'check': '<path d="M20 6 9 17l-5-5"/>',
+	'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+	'clock': '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+	'corner-left-up': '<path d="M14 9 9 4 4 9"/><path d="M20 20h-7a4 4 0 0 1-4-4V4"/>',
+	'eye': '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+	'eye-off': '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+	'folder': '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+	'folder-open': '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+	'info': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+	'lock': '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+	'octagon-alert': '<path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z"/>',
+	'triangle-alert': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+}
+
+function icon(name, cls = '') {
+	return `<svg class="lucide${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`
+}
+
+/** "…/parent/base" for long absolute paths; full path belongs in a title tooltip. */
+function shortenPath(p) {
+	const parts = String(p).split('/').filter(Boolean)
+	if (parts.length <= 3)
+		return p
+	return '…/' + parts.slice(-2).join('/')
+}
+
 function fmtValue(v, format, currency) {
 	if (v === null || v === undefined || v === '') return ''
 	if (format === 'currency') {
@@ -146,15 +174,20 @@ function renderTree() {
 			</div>`).join('')
 		return `<div class="group ${isC ? 'collapsed' : ''}">
 			<div class="group-row" data-group="${esc(g.name)}">
-				<span class="caret">▾</span>📁 ${esc(g.name)}
+				<span class="caret">${icon('chevron-down')}</span>${icon('folder')} ${esc(g.name)}
 			</div>
 			<div class="items">${items}</div>
 		</div>`
 	}).join('') || '<div style="padding:16px;color:var(--muted)">(no canvases yet)</div>'
 
-	$('wsStats').textContent = `${state.tree.count} canvases · ${state.tree.collections.length} groups`
-	$('rootpath').textContent = state.tree.root
-	$('watchPath').textContent = state.tree.root
+	const n = state.tree.count, ng = state.tree.collections.length
+	$('wsStats').textContent = `${n} canvas${n === 1 ? '' : 'es'} · ${ng} group${ng === 1 ? '' : 's'}`
+	const rootEl = $('rootpath')
+	rootEl.textContent = shortenPath(state.tree.root)
+	rootEl.title = state.tree.root
+	const watchEl = $('watchPath')
+	watchEl.textContent = state.tree.root.split('/').filter(Boolean).pop() || state.tree.root
+	watchEl.title = state.tree.root
 }
 
 $('tree').addEventListener('click', (e) => {
@@ -376,7 +409,7 @@ function controlHtml(field) {
 		case 'textarea':
 			return `<textarea class="inp" ${name} ${a}>${esc(def)}</textarea>`
 		case 'secret':
-			return `<div class="inp-wrap"><input class="inp" type="password" ${name} ${a} autocomplete="off" placeholder="${esc(field.placeholder || '••••••••')}"><button type="button" class="eye" data-eye title="Reveal">👁</button></div>`
+			return `<div class="inp-wrap"><input class="inp" type="password" ${name} ${a} autocomplete="off" placeholder="${esc(field.placeholder || '••••••••')}"><button type="button" class="eye" data-eye title="Reveal">${icon('eye')}</button></div>`
 		case 'email': case 'url': case 'tel': case 'date':
 			return `<input class="inp" type="${field.type}" ${name} value="${esc(def)}" ${a}>`
 		case 'datetime':
@@ -436,7 +469,7 @@ function renderForm(block) {
 		${block.description ? `<p style="color:var(--muted);margin:4px 0 10px">${esc(block.description)}</p>` : ''}
 		<form id="theForm" novalidate>
 			${destinationLine(block.destination)}
-			<div class="secbanner">🔒 <div>These values are saved <b>locally</b> to the file above and are <b>not</b> sent back to the agent or into the chat context.</div></div>
+			<div class="secbanner">${icon('lock')} <div>These values are saved <b>locally</b> to the file above and are <b>not</b> sent back to the agent or into the chat context.</div></div>
 			${noSession ? '<div class="placeholder" style="margin-bottom:14px">No active agent session for this form — ask the agent to run <code>open</code> to start one.</div>' : ''}
 			${fieldsHtml}
 			<div class="form-actions">
@@ -449,11 +482,11 @@ function renderForm(block) {
 
 function renderConfirm(block) {
 	const severity = block.severity || 'info'
-	const icon = severity === 'danger' ? '🛑' : severity === 'warning' ? '⚠' : 'ⓘ'
+	const headIcon = severity === 'danger' ? icon('octagon-alert') : severity === 'warning' ? icon('triangle-alert') : icon('info')
 	const noSession = !state.session
 	return `<div class="block">
 		<div class="confirm ${esc(severity)}" id="theConfirm">
-			<div class="confirm-head">${icon} ${esc(block.title)}</div>
+			<div class="confirm-head">${headIcon} ${esc(block.title)}</div>
 			<div class="confirm-body">
 				${block.description ? `<p style="margin-top:0;color:var(--muted)">${esc(block.description)}</p>` : ''}
 				${(block.details || []).map((d) => `<div class="confirm-detail"><span class="k">${esc(d.label)}</span><span>${esc(d.value)}</span></div>`).join('')}
@@ -500,7 +533,7 @@ function askConfirmation({ title, bodyHtml, confirmLabel }) {
 		const ov = document.createElement('div')
 		ov.className = 'overlay'
 		ov.innerHTML = `<div class="modal">
-			<div class="modal-head">⚠ ${esc(title)}</div>
+			<div class="modal-head">${icon('triangle-alert')} ${esc(title)}</div>
 			<div class="modal-body">${bodyHtml}</div>
 			<div class="modal-foot">
 				<button class="btn ghost" data-no>Cancel</button>
@@ -521,7 +554,7 @@ function showSuccess(payload) {
 	ov.className = 'overlay'
 	const wroteFile = result.status === 'saved'
 	ov.innerHTML = `<div class="modal"><div class="modal-body center">
-		<div class="success-mark">✓</div>
+		<div class="success-mark">${icon('check')}</div>
 		<h2 style="margin:0 0 6px">${wroteFile ? 'Saved successfully' : 'Submitted'}</h2>
 		<div style="color:var(--muted)">${wroteFile
 			? `${fields.length} values written to <code>${esc(destination.path)}</code>`
@@ -596,7 +629,7 @@ async function submitForm(form, block) {
 function sessionExpiredView() {
 	const main = document.querySelector('#theForm, #theConfirm')
 	if (main)
-		main.outerHTML = '<div class="placeholder" style="margin:22px 0">⏱ This session has expired — the agent received <code>{"status":"timeout"}</code>. Ask it to run <code>open</code> again.</div>'
+		main.outerHTML = `<div class="placeholder" style="margin:22px 0">${icon('clock')} This session has expired — the agent received <code>{"status":"timeout"}</code>. Ask it to run <code>open</code> again.</div>`
 }
 
 function wireInteractive(blocks) {
@@ -635,7 +668,10 @@ function wireInteractive(blocks) {
 		const eye = e.target.closest('[data-eye]')
 		if (eye) {
 			const inp = eye.previousElementSibling
-			inp.type = inp.type === 'password' ? 'text' : 'password'
+			const reveal = inp.type === 'password'
+			inp.type = reveal ? 'text' : 'password'
+			eye.innerHTML = icon(reveal ? 'eye-off' : 'eye')
+			eye.title = reveal ? 'Hide' : 'Reveal'
 			return
 		}
 		if (e.target.closest('[data-cancel]') && state.session) {
@@ -761,7 +797,7 @@ async function openFolderModal() {
 	const ov = document.createElement('div')
 	ov.className = 'overlay'
 	ov.innerHTML = `<div class="modal">
-		<div class="modal-head">📂 Open workspace folder</div>
+		<div class="modal-head">${icon('folder-open')} Open workspace folder</div>
 		<div class="modal-body">
 			<div class="fb-crumb" id="fbCrumb"></div>
 			<div class="fb-list" id="fbList"></div>
@@ -802,11 +838,12 @@ async function openFolderModal() {
 		if (!json || !json.ok) { toast('Cannot list that directory.'); return }
 		dir = json.dir
 		parent = json.parent
-		ov.querySelector('#fbCrumb').textContent = '📁 ' + dir
-		const up = parent ? '<div class="fb-row" data-up>⬑ ..</div>' : ''
+		ov.querySelector('#fbCrumb').textContent = dir
+		ov.querySelector('#fbCrumb').title = dir
+		const up = parent ? `<div class="fb-row" data-up>${icon('corner-left-up')} ..</div>` : ''
 		ov.querySelector('#fbList').innerHTML = up + json.entries.map((en) => `
 			<div class="fb-row ${selected === en.path ? 'sel' : ''}" data-path="${esc(en.path)}" data-count="${en.canvasCount}">
-				📁 ${esc(en.name)} ${en.canvasCount > 0 ? `<span class="fb-badge">✓ workspace (${en.canvasCount} canvases)</span>` : ''}
+				${icon('folder')} ${esc(en.name)} ${en.canvasCount > 0 ? `<span class="fb-badge">${icon('check')} workspace (${en.canvasCount} canvas${en.canvasCount === 1 ? '' : 'es'})</span>` : ''}
 			</div>`).join('') || (up + '<div class="fb-row" style="cursor:default;color:var(--muted)">(no subfolders)</div>')
 		ov.querySelectorAll('.fb-row[data-path]').forEach((row) => {
 			row.addEventListener('click', () => {

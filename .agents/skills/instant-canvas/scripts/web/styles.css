@@ -20,6 +20,22 @@
 	}
 }
 *{box-sizing:border-box}
+
+/* Lucide icons: inline SVG, stroke = currentColor, sized by context */
+.lucide{width:1em;height:1em;flex:0 0 auto;vertical-align:-0.15em}
+.tbtn .lucide{width:15px;height:15px}
+.group-row .lucide{width:14px;height:14px}
+.group-row .caret .lucide{width:12px;height:12px;display:block}
+.fb-row .lucide{width:15px;height:15px;color:var(--muted)}
+.fb-badge .lucide{width:11px;height:11px}
+.secbanner > .lucide{width:16px;height:16px;color:var(--accent);margin-top:2px}
+.confirm-head .lucide{width:17px;height:17px}
+.confirm.warning .confirm-head .lucide{color:var(--amber)}
+.confirm.danger .confirm-head .lucide{color:var(--red)}
+.modal-head .lucide{width:17px;height:17px}
+.success-mark .lucide{width:28px;height:28px;stroke-width:2.5}
+.inp-wrap .eye .lucide{width:16px;height:16px;display:block}
+.placeholder .lucide{vertical-align:-0.2em}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);
 	font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -34,10 +50,13 @@ button{font:inherit;cursor:pointer}
 .brand .logo{width:20px;height:20px;border-radius:50%;
 	background:conic-gradient(var(--accent) 50%, transparent 50%);border:2px solid var(--accent)}
 .rootpath{color:var(--muted);font-size:12.5px;padding:3px 8px;border:1px solid var(--border);
-	border-radius:7px;background:var(--panel-2)}
+	border-radius:7px;background:var(--panel-2);max-width:42vw;min-width:0;
+	white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+	font-family:ui-monospace,SFMono-Regular,Menlo,monospace;cursor:default}
 .spacer{flex:1}
 .tbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:8px;
-	border:1px solid var(--border);background:var(--panel);color:var(--text)}
+	border:1px solid var(--border);background:var(--panel);color:var(--text);
+	white-space:nowrap;flex:0 0 auto}
 .tbtn:hover{background:var(--panel-2)}
 .tbtn.primary{background:var(--accent);color:#fff;border-color:transparent}
 .tbtn.icon{padding:6px 9px}
@@ -52,7 +71,7 @@ button{font:inherit;cursor:pointer}
 .group-row{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;color:var(--muted);
 	font-weight:600;font-size:12.5px;user-select:none;cursor:pointer}
 .group-row:hover{background:var(--panel-2);color:var(--text)}
-.group-row .caret{transition:transform .12s;font-size:10px;opacity:.7}
+.group-row .caret{transition:transform .12s;opacity:.7;display:inline-flex;align-items:center}
 .group.collapsed .caret{transform:rotate(-90deg)}
 .group.collapsed .items{display:none}
 .item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 26px;border-radius:7px;
@@ -61,7 +80,10 @@ button{font:inherit;cursor:pointer}
 .item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .item .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex:0 0 6px}
 .side-foot{padding:10px 16px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px}
-.side-foot .watch{display:flex;align-items:center;gap:6px;margin-top:4px}
+.side-foot .watch{display:flex;align-items:center;gap:6px;margin-top:4px;min-width:0}
+.side-foot .watch #watchState{flex:0 0 auto}
+.side-foot .watch #watchPath{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+	font-family:ui-monospace,SFMono-Regular,Menlo,monospace;cursor:default}
 .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 var(--green);
 	animation:pulse 2s infinite}
 .pulse.off{background:var(--red);animation:none}
@@ -131,7 +153,9 @@ table.tbl td.num,table.tbl th.num{text-align:right;font-variant-numeric:tabular-
 textarea.inp{min-height:88px;resize:vertical}
 select.inp{appearance:auto}
 .inp-wrap{position:relative;display:flex;align-items:center}
-.inp-wrap .eye{position:absolute;right:8px;background:none;border:none;font-size:15px;opacity:.6}
+.inp-wrap .eye{position:absolute;right:8px;background:none;border:none;opacity:.6;
+	display:flex;align-items:center;color:var(--muted);padding:4px}
+.inp-wrap .eye:hover{opacity:1;color:var(--text)}
 .radios{display:flex;gap:16px;flex-wrap:wrap}
 .radios label{display:flex;align-items:center;gap:7px;font-weight:500}
 .checks{display:flex;flex-direction:column;gap:8px}
