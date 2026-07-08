@@ -7,8 +7,29 @@
 <link rel="stylesheet" href="/assets/styles.css?token=__IC_TOKEN__" />
 </head>
 <body>
-<div id="app">InstantCanvas shell placeholder (Phase F).</div>
-<script>window.IC_TOKEN = "__IC_TOKEN__"</script>
+<div class="app">
+	<div class="topbar">
+		<div class="brand"><span class="logo"></span> InstantCanvas</div>
+		<span class="rootpath" id="rootpath">…</span>
+		<div class="spacer"></div>
+		<button class="tbtn" id="openFolder">📂 Open folder…</button>
+		<button class="tbtn icon" id="themeBtn" title="Toggle theme">◐</button>
+		<button class="tbtn icon" id="stopBtn" title="Stop kernel">⏻</button>
+	</div>
+	<div class="body">
+		<aside class="sidebar">
+			<div class="side-head">WORKSPACE</div>
+			<div class="tree" id="tree"></div>
+			<div class="side-foot">
+				<div id="wsStats">— canvases</div>
+				<div class="watch"><span class="pulse" id="pulse"></span> <span id="watchState">connecting</span> <span id="watchPath"></span></div>
+			</div>
+		</aside>
+		<main class="main" id="main"></main>
+	</div>
+</div>
+<script src="/assets/vendor/markdown-it.min.js?token=__IC_TOKEN__"></script>
+<script src="/assets/vendor/echarts.min.js?token=__IC_TOKEN__"></script>
 <script src="/assets/app.js?token=__IC_TOKEN__"></script>
 </body>
 </html>
