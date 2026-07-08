@@ -378,7 +378,7 @@ async function route(req, res, url) {
 	const p = url.pathname
 
 	if (method === 'GET' && p === '/healthz')
-		return sendJson(res, 200, { ok: true, name: 'instantcanvas', version: VERSION, workspace: NORM_ROOT, pid: process.pid })
+		return sendJson(res, 200, { ok: true, name: 'instantcanvas', version: VERSION, workspace: NORM_ROOT, pid: process.pid, pendingSessions: sessions.pendingCount() })
 
 	if (method === 'GET' && p === '/')
 		return serveShell(res)
