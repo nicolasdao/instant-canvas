@@ -1,6 +1,6 @@
 ---
 name: instant-canvas
-description: Render agent-wrangled data as local interactive canvases (charts, tables, KPIs, markdown) and safely collect user input/secrets via local browser forms that write directly to files — values never enter the chat.
+description: InstantCanvas — Render data as local interactive canvases and capture secrets straight to files, never the chat. Use when visualizing data as charts, tables, KPIs or dashboards, collecting credentials or env vars, or confirming destructive actions.
 allowed-tools: Bash, Read, Write, Edit
 ---
 
