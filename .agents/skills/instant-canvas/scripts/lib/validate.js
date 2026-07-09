@@ -1,6 +1,6 @@
 'use strict'
 
-const { ENVELOPE, BLOCKS, FIELD_TYPES, SHAPES, ENV_KEY_RE, VERSION } = require('./schema')
+const { ENVELOPE, BLOCKS, FIELD_TYPES, CHART_KINDS, UNSUPPORTED_CHARTS, SHAPES, ENV_KEY_RE, VERSION } = require('./schema')
 const { insideRoot } = require('./paths')
 
 // ---------------------------------------------------------------- helpers
@@ -277,47 +277,93 @@ function checkMarkdown(block, base, ctx) {
 }
 
 function checkChart(block, base, ctx) {
-	const enc = block.encoding
-	if (typeOf(enc) !== 'object')
-		return // reported by checkObject
-	const needed = block.kind === 'pie' ? ['category', 'value'] : ['x', 'y']
-	if (block.kind === 'pie' || block.kind === 'line' || block.kind === 'bar') {
-		for (const key of needed) {
-			if (enc[key] === undefined)
-				ctx.error('MISSING_REQUIRED_PROPERTY', `${base}.encoding.${key}`, `A "${block.kind}" chart requires encoding.${key}.`, {
-					expected: key === 'y' ? 'string | string[] — data key(s), one series per key' : 'string — a data key',
-					example: block.kind === 'pie' ? { encoding: { category: 'channel', value: 'revenue' } } : { encoding: { x: 'month', y: ['signups'] } },
-				})
-		}
-	}
-	if (block.donut && block.kind !== 'pie')
-		ctx.warn('UNKNOWN_PROPERTY', `${base}.donut`, '"donut" only applies to pie charts.', {})
-	// Every referenced key must exist in data[0].
-	if (Array.isArray(block.data) && block.data.length) {
-		block.data.forEach((row, i) => {
-			if (typeOf(row) !== 'object')
-				ctx.error('INVALID_PROPERTY_TYPE', `${base}.data[${i}]`, `Chart data items must be flat objects, got ${typeOf(row)}.`, { got: typeOf(row), expected: 'object' })
-		})
-		const sample = block.data[0]
-		if (typeOf(sample) === 'object') {
-			const refs = []
-			for (const key of needed) {
-				const v = enc[key]
-				if (typeof v === 'string') refs.push({ encKey: key, dataKey: v })
-				else if (Array.isArray(v)) v.forEach((dk, i) => typeof dk === 'string' && refs.push({ encKey: `${key}[${i}]`, dataKey: dk }))
-			}
-			for (const { encKey, dataKey } of refs) {
-				if (!(dataKey in sample)) {
-					const near = closest(dataKey, Object.keys(sample))
-					ctx.error('ENCODING_KEY_NOT_IN_DATA', `${base}.encoding.${encKey}`, `Encoding refers to "${dataKey}" but data[0] has no such key.`, {
-						got: dataKey,
-						expected: Object.keys(sample),
-						...(near ? { hint: `Did you mean "${near}"?` } : {}),
-					})
+	const def = CHART_KINDS[block.kind]
+	if (!def) {
+		// kind was already rejected by the generic enum check — enrich THAT error
+		// (in place, no duplicate) with unsupported-kind reasons or alias hints.
+		const existing = ctx.errors.find((e) => e.code === 'INVALID_ENUM_VALUE' && e.path === `${base}.kind`)
+		if (existing && typeof block.kind === 'string') {
+			const lower = block.kind.toLowerCase()
+			const reason = UNSUPPORTED_CHARTS[block.kind] || UNSUPPORTED_CHARTS[lower]
+			if (reason) {
+				existing.message = `"${block.kind}" is a real ECharts kind but is not supported here: ${reason}`
+			} else {
+				for (const [name, kd] of Object.entries(CHART_KINDS)) {
+					if ((kd.aliases || []).some((a) => a.toLowerCase() === lower)) {
+						existing.hint = `Did you mean "${name}"? Run \`catalog ${name}\` for its exact schema.`
+						existing.example = kd.example
+						break
+					}
 				}
 			}
 		}
+		return
 	}
+
+	const enc = typeOf(block.encoding) === 'object' ? block.encoding : {}
+	if (block.encoding !== undefined && typeOf(block.encoding) !== 'object')
+		return // reported by checkObject
+
+	// Rows must be objects (all kinds — trees and links are objects too).
+	const rows = Array.isArray(block.data) ? block.data : []
+	rows.forEach((row, i) => {
+		if (typeOf(row) !== 'object')
+			ctx.error('INVALID_PROPERTY_TYPE', `${base}.data[${i}]`, `Chart data items must be objects, got ${typeOf(row)}.`, { got: typeOf(row), expected: 'object' })
+	})
+	const sample = rows.length && typeOf(rows[0]) === 'object' ? rows[0] : null
+
+	const checkKeyInData = (encKeyLabel, dataKey) => {
+		if (!sample || dataKey in sample)
+			return
+		const near = closest(dataKey, Object.keys(sample))
+		ctx.error('ENCODING_KEY_NOT_IN_DATA', `${base}.encoding.${encKeyLabel}`, `Encoding refers to "${dataKey}" but data[0] has no such key.`, {
+			got: dataKey,
+			expected: Object.keys(sample),
+			...(near ? { hint: `Did you mean "${near}"?` } : {}),
+		})
+	}
+
+	for (const [key, spec] of Object.entries(def.encoding)) {
+		const value = enc[key] !== undefined ? enc[key] : spec.default
+		if (value === undefined) {
+			if (spec.required)
+				ctx.error('MISSING_REQUIRED_PROPERTY', `${base}.encoding.${key}`, `A "${block.kind}" chart requires encoding.${key}: ${spec.description}`, {
+					expected: spec.type === 'keys' ? 'string | string[] — data key(s)' : spec.type === 'key' ? 'string — a data key' : spec.type,
+					example: def.example,
+				})
+			continue
+		}
+		if (spec.type === 'key') {
+			if (typeof value !== 'string') {
+				ctx.error('INVALID_PROPERTY_TYPE', `${base}.encoding.${key}`, `encoding.${key} must be a string (a data key), got ${typeOf(value)}.`, { got: typeOf(value), expected: 'string' })
+			} else if (spec.checkInData !== false) {
+				checkKeyInData(key, value) // defaults are checked too (e.g. treemap's "name")
+			}
+		} else if (spec.type === 'keys') {
+			const list = Array.isArray(value) ? value : [value]
+			if (!list.length || list.some((k) => typeof k !== 'string')) {
+				ctx.error('INVALID_PROPERTY_TYPE', `${base}.encoding.${key}`, `encoding.${key} must be a data key or a non-empty list of data keys.`, { got: value, expected: 'string | string[]' })
+			} else if (spec.checkInData !== false) {
+				list.forEach((k, i) => checkKeyInData(list.length > 1 ? `${key}[${i}]` : key, k))
+			}
+		} else if (spec.type === 'number' && typeof value !== 'number') {
+			ctx.error('INVALID_PROPERTY_TYPE', `${base}.encoding.${key}`, `encoding.${key} must be a number, got ${typeOf(value)}.`, { got: typeOf(value), expected: 'number' })
+		} else if (spec.type === 'boolean' && typeof value !== 'boolean') {
+			ctx.error('INVALID_PROPERTY_TYPE', `${base}.encoding.${key}`, `encoding.${key} must be true or false, got ${typeOf(value)}.`, { got: typeOf(value), expected: 'boolean' })
+		}
+	}
+
+	for (const key of Object.keys(enc)) {
+		if (!def.encoding[key]) {
+			const near = closest(key, Object.keys(def.encoding))
+			ctx.warn('UNKNOWN_PROPERTY', `${base}.encoding.${key}`, `"${block.kind}" charts have no encoding.${key} channel.`, {
+				...(near ? { hint: `Did you mean "${near}"?` } : { hint: `Channels for "${block.kind}": ${Object.keys(def.encoding).join(', ')}.` }),
+			})
+		}
+	}
+
+	if (block.donut && block.kind !== 'pie')
+		ctx.warn('UNKNOWN_PROPERTY', `${base}.donut`, '"donut" only applies to pie charts.', {})
 }
 
 function checkTable(block, base, ctx) {

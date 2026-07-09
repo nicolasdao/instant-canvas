@@ -6,48 +6,80 @@ const { catalog } = require('../lib/catalog')
 const schema = require('../lib/schema')
 const { validate } = require('../lib/validate')
 
-test('full catalog covers all 6 block types and all 16 field types', () => {
-	const c = catalog()
-	assert.deepEqual(Object.keys(c.blocks).sort(), ['chart', 'confirm', 'form', 'kpi', 'markdown', 'table'])
-	assert.equal(Object.keys(c.fieldTypes).length, 16)
-	assert.equal(c.version, 1)
-	assert.ok(c.envelope.properties.instantcanvas.required)
-	assert.ok(c.fieldCommonShape.properties.name.required)
-	// every block has an example and typed properties
-	for (const [name, b] of Object.entries(c.blocks)) {
-		assert.ok(b.description, name + ' has description')
-		assert.ok(b.example, name + ' has example')
-		assert.ok(['display', 'interactive'].includes(b.kind))
+test('bare catalog is the LEAN index: one-liners for everything, no schemas (progressive disclosure)', () => {
+	const lean = catalog()
+	assert.equal(lean.version, 1)
+	assert.match(lean.usage, /catalog <name>/)
+	assert.deepEqual(Object.keys(lean.blocks).sort(), ['chart', 'confirm', 'form', 'kpi', 'markdown', 'table'])
+	assert.equal(Object.keys(lean.chartKinds).length, 17)
+	assert.equal(Object.keys(lean.fieldTypes).length, 16)
+	assert.ok(lean.unsupportedChartKinds.map, 'unsupported kinds documented with reasons')
+	// lean means lean: values are strings, no property schemas anywhere
+	for (const v of Object.values(lean.blocks)) assert.equal(typeof v, 'string')
+	for (const v of Object.values(lean.chartKinds)) assert.equal(typeof v, 'string')
+	for (const v of Object.values(lean.fieldTypes)) assert.equal(typeof v, 'string')
+	assert.ok(!JSON.stringify(lean).includes('"properties"'))
+	assert.ok(JSON.stringify(lean).length < 6000, 'index stays small: ' + JSON.stringify(lean).length)
+})
+
+test('catalog --full still exposes the complete contract', () => {
+	const full = catalog('--full')
+	assert.equal(Object.keys(full.blocks).length, 6)
+	assert.equal(Object.keys(full.chartKinds).length, 17)
+	assert.equal(Object.keys(full.fieldTypes).length, 16)
+	assert.ok(full.blocks.form.properties.destination)
+	assert.ok(full.fieldCommonShape.properties.name.required)
+	assert.ok(full.fieldsetShape.properties.columns)
+})
+
+test('catalog(name) returns exactly one schema: block, chart kind, field type, fieldset, envelope', () => {
+	const chart = catalog('chart')
+	assert.equal(chart.block, 'chart')
+	assert.equal(Object.keys(chart.kinds).length, 17, 'chart block lists kinds as one-liners')
+	assert.equal(typeof chart.kinds.sankey, 'string')
+
+	const sankey = catalog('sankey')
+	assert.equal(sankey.chartKind, 'sankey')
+	assert.ok(sankey.whenToUse)
+	assert.ok(sankey.encoding.source.required)
+	assert.equal(validate({ instantcanvas: 1, title: 'x', blocks: [sankey.example] }).ok, true, 'kind example is valid')
+
+	const secret = catalog('secret')
+	assert.equal(secret.fieldType, 'secret')
+	assert.ok(secret.commonShape.properties.name.required)
+
+	assert.ok(catalog('fieldset').properties.columns)
+	assert.ok(catalog('envelope').properties.instantcanvas.required)
+
+	assert.throws(() => catalog('nope'), (e) => e.code === 'INVALID_SPEC' && /chart kinds/i.test(e.message))
+	assert.throws(() => catalog('custom'), (e) => e.code === 'INVALID_SPEC' && /renderItem/.test(e.message), 'unsupported kinds explain why')
+})
+
+test('every chart kind example validates cleanly (registry cannot drift from validator)', () => {
+	for (const [name, def] of Object.entries(schema.CHART_KINDS)) {
+		const res = validate({ instantcanvas: 1, title: 'ex', blocks: [def.example] })
+		assert.equal(res.ok, true, `${name} example validates: ${JSON.stringify(res.errors)}`)
+		assert.deepEqual(res.warnings, [], `${name} example has no warnings: ${JSON.stringify(res.warnings)}`)
 	}
 })
 
-test('catalog(name) returns a single block or field type; unknown name throws INVALID_SPEC', () => {
-	const chart = catalog('chart')
-	assert.equal(chart.block, 'chart')
-	assert.deepEqual(chart.properties.kind.enum, ['line', 'bar', 'pie'])
-	const secret = catalog('secret')
-	assert.equal(secret.fieldType, 'secret')
-	assert.match(secret.description, /Never logged/)
-	assert.throws(() => catalog('nope'), (e) => e.code === 'INVALID_SPEC')
-})
-
 test('registry is the single source of truth: one schema tweak changes validator AND catalog', () => {
-	const kindSpec = schema.BLOCKS.chart.properties.kind
+	const kindSpec = schema.BLOCKS.chart.properties.kind.enum
 	const block = { type: 'chart', kind: 'sparkline', data: [{ a: 1, b: 2 }], encoding: { x: 'a', y: 'b' } }
 	const doc = { instantcanvas: 1, title: 'x', blocks: [block] }
 	assert.equal(validate(doc).ok, false, 'sparkline rejected before the tweak')
 	assert.equal(catalog('chart').properties.kind.enum.includes('sparkline'), false)
-	kindSpec.enum.push('sparkline')
+	kindSpec.push('sparkline')
 	try {
 		assert.equal(validate(doc).ok, true, 'validator follows the registry')
 		assert.equal(catalog('chart').properties.kind.enum.includes('sparkline'), true, 'catalog follows the registry')
 	} finally {
-		kindSpec.enum.pop()
+		kindSpec.pop()
 	}
 	assert.equal(validate(doc).ok, false)
 })
 
-test('valid-display fixture round-trips against the envelope example', () => {
+test('every block example validates', () => {
 	const r = validate(schema.ENVELOPE.example)
 	assert.equal(r.ok, true)
 	for (const [name, def] of Object.entries(schema.BLOCKS)) {

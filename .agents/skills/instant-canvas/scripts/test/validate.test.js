@@ -84,12 +84,13 @@ test('UNKNOWN_BLOCK_TYPE with alias hint', () => {
 test('INVALID_PROPERTY_TYPE and INVALID_ENUM_VALUE', () => {
 	const r = validate(canvas([
 		{ type: 'table', columns: 'nope', rows: [] },
-		{ type: 'chart', kind: 'scatter', data: [{ a: 1 }], encoding: { x: 'a', y: 'a' } },
+		{ type: 'chart', kind: 'blorp', data: [{ a: 1 }], encoding: { x: 'a', y: 'a' } },
 	]))
 	assert.ok(codes(r).includes('INVALID_PROPERTY_TYPE'))
 	const en = r.errors.find((x) => x.code === 'INVALID_ENUM_VALUE')
 	assert.equal(en.path, 'blocks[1].kind')
-	assert.deepEqual(en.expected, ['line', 'bar', 'pie'])
+	assert.equal(en.expected.length, 17)
+	assert.ok(en.expected.includes('sankey'))
 })
 
 test('MULTIPLE_INTERACTIVE_BLOCKS across pages', () => {
@@ -132,8 +133,49 @@ test('markdown XOR text/src', () => {
 test('chart structural rules: per-kind encoding + pie donut', () => {
 	const missing = validate(canvas([{ type: 'chart', kind: 'pie', data: [{ channel: 'a', revenue: 1 }], encoding: { x: 'channel' } }]))
 	assert.ok(missing.errors.filter((e) => e.code === 'MISSING_REQUIRED_PROPERTY').length >= 2, 'pie needs category+value')
+	assert.ok(missing.warnings.some((w) => w.path.endsWith('encoding.x')), 'unknown channel warned with the valid channel list')
 	const ok = validate(canvas([{ type: 'chart', kind: 'pie', donut: true, data: [{ channel: 'a', revenue: 1 }], encoding: { category: 'channel', value: 'revenue' } }]))
 	assert.equal(ok.ok, true)
+})
+
+test('chart kinds: registry-driven validation across the 17 kinds', () => {
+	// missing required channel
+	const scatter = validate(canvas([{ type: 'chart', kind: 'scatter', data: [{ px: 1, rating: 2 }], encoding: { x: 'px' } }]))
+	assert.ok(scatter.errors.some((e) => e.code === 'MISSING_REQUIRED_PROPERTY' && e.path.endsWith('encoding.y')))
+
+	// encoding key not in data, with hint
+	const sankey = validate(canvas([{ type: 'chart', kind: 'sankey', data: [{ from: 'a', to: 'b', visits: 3 }], encoding: { source: 'from', target: 'to', value: 'vists' } }]))
+	const bad = sankey.errors.find((e) => e.code === 'ENCODING_KEY_NOT_IN_DATA')
+	assert.equal(bad.path, 'blocks[0].encoding.value')
+	assert.match(bad.hint, /Did you mean "visits"/)
+
+	// wrong channel value types
+	const gauge = validate(canvas([{ type: 'chart', kind: 'gauge', data: [{ pct: 70 }], encoding: { value: 'pct', min: '0' } }]))
+	assert.ok(gauge.errors.some((e) => e.code === 'INVALID_PROPERTY_TYPE' && e.path.endsWith('encoding.min')))
+	const radar = validate(canvas([{ type: 'chart', kind: 'radar', data: [{ a: 1 }], encoding: { dimensions: [] } }]))
+	assert.ok(radar.errors.some((e) => e.code === 'INVALID_PROPERTY_TYPE' && e.path.endsWith('encoding.dimensions')))
+
+	// treemap: default name/value keys checked against data even without encoding
+	const treemapOk = validate(canvas([{ type: 'chart', kind: 'treemap', data: [{ name: 'src', value: 10 }] }]))
+	assert.equal(treemapOk.ok, true, JSON.stringify(treemapOk.errors))
+	const treemapBad = validate(canvas([{ type: 'chart', kind: 'treemap', data: [{ label: 'src', size: 10 }] }]))
+	assert.ok(treemapBad.errors.filter((e) => e.code === 'ENCODING_KEY_NOT_IN_DATA').length >= 2, 'default name/value not in data')
+	const treemapRenamed = validate(canvas([{ type: 'chart', kind: 'treemap', data: [{ label: 'src', size: 10 }], encoding: { name: 'label', value: 'size' } }]))
+	assert.equal(treemapRenamed.ok, true)
+
+	// unsupported ECharts kind gets an explanatory error; alias gets a redirect hint
+	const map = validate(canvas([{ type: 'chart', kind: 'map', data: [{ a: 1 }] }]))
+	const mapErr = map.errors.find((e) => e.code === 'INVALID_ENUM_VALUE' && e.path.endsWith('.kind'))
+	assert.match(mapErr.message, /GeoJSON/)
+	const network = validate(canvas([{ type: 'chart', kind: 'network', data: [{ a: 'x', b: 'y' }] }]))
+	const netErr = network.errors.find((e) => e.code === 'INVALID_ENUM_VALUE' && e.path.endsWith('.kind'))
+	assert.match(netErr.hint, /Did you mean "graph"/)
+
+	// candlestick/boxplot full channel sets enforced
+	const candle = validate(canvas([{ type: 'chart', kind: 'candlestick', data: [{ date: 'd', o: 1, c: 2, l: 0, h: 3 }], encoding: { x: 'date', open: 'o', close: 'c', low: 'l', high: 'h' } }]))
+	assert.equal(candle.ok, true)
+	const box = validate(canvas([{ type: 'chart', kind: 'boxplot', data: [{ svc: 'api', min: 1, q1: 2, median: 3, q3: 4 }], encoding: { x: 'svc', min: 'min', q1: 'q1', median: 'median', q3: 'q3' } }]))
+	assert.ok(box.errors.some((e) => e.path.endsWith('encoding.max')))
 })
 
 test('field structural rules: options/range/label requirements', () => {

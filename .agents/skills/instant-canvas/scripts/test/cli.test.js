@@ -48,16 +48,28 @@ test('cli: validate — valid file exits 0, broken file exits 1, stdout is exact
 	assert.equal(missing.json.ok, false)
 })
 
-test('cli: catalog — full contract and single-entry lookup', () => {
-	const full = run(['catalog'])
-	assert.equal(full.code, 0)
-	assert.equal(Object.keys(full.json.blocks).length, 6)
-	assert.equal(Object.keys(full.json.fieldTypes).length, 16)
+test('cli: catalog — lean index by default, one schema per name, --full for everything', () => {
+	const lean = run(['catalog'])
+	assert.equal(lean.code, 0)
+	assert.equal(Object.keys(lean.json.blocks).length, 6)
+	assert.equal(Object.keys(lean.json.chartKinds).length, 17)
+	assert.equal(Object.keys(lean.json.fieldTypes).length, 16)
+	assert.ok(!lean.stdout.includes('"properties"'), 'lean index carries no schemas')
 
 	const chart = run(['catalog', 'chart'])
 	assert.equal(chart.code, 0)
 	assert.equal(chart.json.block, 'chart')
-	assert.equal(chart.json.fieldType, undefined)
+	assert.equal(Object.keys(chart.json.kinds).length, 17)
+
+	const scatter = run(['catalog', 'scatter'])
+	assert.equal(scatter.code, 0)
+	assert.equal(scatter.json.chartKind, 'scatter')
+	assert.ok(scatter.json.encoding.x.required)
+	assert.ok(scatter.json.example)
+
+	const full = run(['catalog', '--full'])
+	assert.equal(full.code, 0)
+	assert.ok(full.json.blocks.form.properties)
 
 	const unknown = run(['catalog', 'nope'])
 	assert.equal(unknown.code, 1)

@@ -44,15 +44,6 @@ const SHAPES = {
 			align: { type: 'string', enum: ['left', 'right'], description: 'Cell alignment. Defaults to right for numeric formats, left for text.' },
 		},
 	},
-	chartEncoding: {
-		description: 'Maps data object keys to visual channels. line/bar: {x, y}; pie: {category, value}.',
-		properties: {
-			x: { type: 'string', description: 'Key for the x axis category (line/bar).', example: 'month' },
-			y: { type: ['string', 'array'], description: 'Key (or list of keys — one series each) for y values (line/bar). Wide format only.', example: ['signups', 'target'] },
-			category: { type: 'string', description: 'Key for slice names (pie).', example: 'channel' },
-			value: { type: 'string', description: 'Key for slice values (pie).', example: 'revenue' },
-		},
-	},
 	chartFormat: {
 		description: 'Axis/tooltip value formatting.',
 		properties: {
@@ -122,6 +113,231 @@ const SHAPES = {
 	},
 }
 
+// ---------------------------------------------------------------------------
+// Chart kinds. Single source of truth for the validator, the catalog and the
+// docs. Encoding value kinds: 'key' (a data-object property name), 'keys'
+// (one key or a list of keys), 'number', 'boolean'. Keys are existence-checked
+// against data[0] unless checkInData: false.
+const CHART_KINDS = {
+	line: {
+		summary: 'Trends over an ordered x axis; one line per y key.',
+		whenToUse: 'Time series, trends, actual-vs-target.',
+		data: 'Flat objects, wide format: one row per x value, one property per series.',
+		aliases: ['timeseries', 'spline'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the x-axis category.' },
+			y: { type: 'keys', required: true, description: 'Key or list of keys — one line per key.' },
+			stack: { type: 'boolean', checkInData: false, description: 'true stacks the series.' },
+		},
+		example: { type: 'chart', kind: 'line', title: 'Signups', data: [{ month: 'Apr', signups: 2000, target: 2200 }, { month: 'May', signups: 2600, target: 2400 }], encoding: { x: 'month', y: ['signups', 'target'] } },
+	},
+	area: {
+		summary: 'Line chart with the area under each series filled.',
+		whenToUse: 'Volumes/totals over time; set encoding.stack for part-of-whole over time.',
+		data: 'Same as line: flat objects, one row per x value.',
+		aliases: ['areaspline', 'stackedarea'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the x-axis category.' },
+			y: { type: 'keys', required: true, description: 'Key or list of keys — one filled series per key.' },
+			stack: { type: 'boolean', checkInData: false, description: 'true stacks the series (part-of-whole).' },
+		},
+		example: { type: 'chart', kind: 'area', title: 'Traffic', data: [{ day: 'Mon', mobile: 120, desktop: 220 }, { day: 'Tue', mobile: 132, desktop: 201 }], encoding: { x: 'day', y: ['mobile', 'desktop'], stack: true } },
+	},
+	bar: {
+		summary: 'Grouped (or stacked) vertical bars per x category.',
+		whenToUse: 'Comparisons across categories; stacked composition with encoding.stack.',
+		data: 'Flat objects, wide format: one row per category.',
+		aliases: ['column', 'histogram'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the category axis.' },
+			y: { type: 'keys', required: true, description: 'Key or list of keys — one bar series per key.' },
+			stack: { type: 'boolean', checkInData: false, description: 'true stacks instead of grouping.' },
+		},
+		example: { type: 'chart', kind: 'bar', title: 'Cost per region', data: [{ region: 'APAC', infra: 42000, people: 118000 }], encoding: { x: 'region', y: ['infra', 'people'] } },
+	},
+	pie: {
+		summary: 'Share-of-total slices; add "donut": true on the block for a donut.',
+		whenToUse: 'Part-of-whole with few (≤ ~7) categories.',
+		data: 'One row per slice.',
+		aliases: ['doughnut', 'donut'],
+		encoding: {
+			category: { type: 'key', required: true, description: 'Key for slice names.' },
+			value: { type: 'key', required: true, description: 'Key for slice values.' },
+		},
+		example: { type: 'chart', kind: 'pie', donut: true, title: 'Plan mix', data: [{ plan: 'Pro', mrr: 84000 }, { plan: 'Team', mrr: 126000 }], encoding: { category: 'plan', value: 'mrr' } },
+	},
+	scatter: {
+		summary: 'Points on numeric x/y; optional bubble size and series grouping.',
+		whenToUse: 'Correlation, distribution, outliers; bubbles via encoding.size.',
+		data: 'One row per point; x and y numeric.',
+		aliases: ['bubble', 'points', 'xy'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for numeric x values.' },
+			y: { type: 'key', required: true, description: 'Key for numeric y values.' },
+			size: { type: 'key', description: 'Optional key: bubble size (scaled automatically).' },
+			series: { type: 'key', description: 'Optional key: groups points into colored series.' },
+			label: { type: 'key', description: 'Optional key: point name shown in the tooltip.' },
+		},
+		example: { type: 'chart', kind: 'scatter', title: 'Price vs rating', data: [{ price: 12, rating: 4.2, sales: 320, tier: 'basic' }, { price: 49, rating: 4.8, sales: 80, tier: 'pro' }], encoding: { x: 'price', y: 'rating', size: 'sales', series: 'tier' } },
+	},
+	heatmap: {
+		summary: 'Value-colored grid over two categorical axes.',
+		whenToUse: 'Intensity across two dimensions: weekday x hour, cohort retention.',
+		data: 'One row per cell: x category, y category, numeric value.',
+		aliases: ['matrix', 'grid'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the x-axis category.' },
+			y: { type: 'key', required: true, description: 'Key for the y-axis category.' },
+			value: { type: 'key', required: true, description: 'Key for the cell value (drives color).' },
+		},
+		example: { type: 'chart', kind: 'heatmap', title: 'Activity', data: [{ day: 'Mon', hour: '9am', commits: 12 }, { day: 'Mon', hour: '10am', commits: 30 }, { day: 'Tue', hour: '9am', commits: 7 }], encoding: { x: 'hour', y: 'day', value: 'commits' } },
+	},
+	radar: {
+		summary: 'Multi-axis “spider” comparison; one polygon per row.',
+		whenToUse: 'Comparing entities across 3–8 shared dimensions (skills, feature scores).',
+		data: 'One row per entity; one numeric property per dimension.',
+		aliases: ['spider', 'web', 'polar'],
+		encoding: {
+			dimensions: { type: 'keys', required: true, description: 'List of numeric keys — one radar axis each.' },
+			name: { type: 'key', description: 'Optional key naming each row (legend/tooltip).' },
+		},
+		example: { type: 'chart', kind: 'radar', title: 'Model scores', data: [{ model: 'A', speed: 90, cost: 60, quality: 85 }, { model: 'B', speed: 70, cost: 95, quality: 78 }], encoding: { dimensions: ['speed', 'cost', 'quality'], name: 'model' } },
+	},
+	funnel: {
+		summary: 'Narrowing stages from top to bottom.',
+		whenToUse: 'Conversion pipelines: visits → signups → purchases.',
+		data: 'One row per stage.',
+		aliases: ['pipeline', 'conversion'],
+		encoding: {
+			category: { type: 'key', required: true, description: 'Key for stage names.' },
+			value: { type: 'key', required: true, description: 'Key for stage values.' },
+		},
+		example: { type: 'chart', kind: 'funnel', title: 'Signup funnel', data: [{ stage: 'Visits', users: 9000 }, { stage: 'Signups', users: 1200 }, { stage: 'Paid', users: 240 }], encoding: { category: 'stage', value: 'users' } },
+	},
+	gauge: {
+		summary: 'Single value on a dial between min and max.',
+		whenToUse: 'One KPI against a target/range: utilization, score, progress.',
+		data: 'A single row holding the value (extra rows are ignored).',
+		aliases: ['dial', 'meter', 'speedometer'],
+		encoding: {
+			value: { type: 'key', required: true, description: 'Key for the value.' },
+			name: { type: 'key', description: 'Optional key for the label under the dial.' },
+			min: { type: 'number', checkInData: false, default: 0, description: 'Dial minimum (number, default 0).' },
+			max: { type: 'number', checkInData: false, default: 100, description: 'Dial maximum (number, default 100).' },
+		},
+		example: { type: 'chart', kind: 'gauge', title: 'CPU', data: [{ metric: 'CPU', pct: 72 }], encoding: { value: 'pct', name: 'metric', min: 0, max: 100 } },
+	},
+	candlestick: {
+		summary: 'Open/close/low/high boxes per x category.',
+		whenToUse: 'Price or range movement over time (OHLC).',
+		data: 'One row per period with four numeric properties.',
+		aliases: ['ohlc', 'kline', 'stock'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the period (date) axis.' },
+			open: { type: 'key', required: true, description: 'Key for the opening value.' },
+			close: { type: 'key', required: true, description: 'Key for the closing value.' },
+			low: { type: 'key', required: true, description: 'Key for the lowest value.' },
+			high: { type: 'key', required: true, description: 'Key for the highest value.' },
+		},
+		example: { type: 'chart', kind: 'candlestick', title: 'ACME', data: [{ date: '07-01', o: 20, c: 34, l: 18, h: 38 }, { date: '07-02', o: 34, c: 30, l: 27, h: 36 }], encoding: { x: 'date', open: 'o', close: 'c', low: 'l', high: 'h' } },
+	},
+	boxplot: {
+		summary: 'Five-number distribution summaries per category.',
+		whenToUse: 'Comparing distributions: latency percentiles, grade spreads.',
+		data: 'One row per category with min/q1/median/q3/max already computed.',
+		aliases: ['box', 'whisker', 'distribution'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the category axis.' },
+			min: { type: 'key', required: true, description: 'Key for the minimum.' },
+			q1: { type: 'key', required: true, description: 'Key for the first quartile.' },
+			median: { type: 'key', required: true, description: 'Key for the median.' },
+			q3: { type: 'key', required: true, description: 'Key for the third quartile.' },
+			max: { type: 'key', required: true, description: 'Key for the maximum.' },
+		},
+		example: { type: 'chart', kind: 'boxplot', title: 'Latency by service', data: [{ svc: 'api', min: 12, q1: 18, median: 24, q3: 40, max: 95 }], encoding: { x: 'svc', min: 'min', q1: 'q1', median: 'median', q3: 'q3', max: 'max' } },
+	},
+	sankey: {
+		summary: 'Flows between nodes with proportional link widths.',
+		whenToUse: 'Where quantities flow: traffic sources → pages, budget allocation.',
+		data: 'One row per LINK: source name, target name, numeric value. Nodes are derived.',
+		aliases: ['flow', 'alluvial'],
+		encoding: {
+			source: { type: 'key', required: true, description: 'Key for the link source node name.' },
+			target: { type: 'key', required: true, description: 'Key for the link target node name.' },
+			value: { type: 'key', required: true, description: 'Key for the flow size.' },
+		},
+		example: { type: 'chart', kind: 'sankey', title: 'Traffic flow', data: [{ from: 'Search', to: 'Landing', visits: 600 }, { from: 'Landing', to: 'Signup', visits: 180 }], encoding: { source: 'from', target: 'to', value: 'visits' } },
+	},
+	graph: {
+		summary: 'Force-directed network of nodes and edges.',
+		whenToUse: 'Relationships: dependencies, social ties, service topology.',
+		data: 'One row per EDGE: source name, target name, optional numeric weight. Nodes are derived (sized by degree).',
+		aliases: ['network', 'nodes', 'force'],
+		encoding: {
+			source: { type: 'key', required: true, description: 'Key for the edge source node name.' },
+			target: { type: 'key', required: true, description: 'Key for the edge target node name.' },
+			value: { type: 'key', description: 'Optional key for edge weight (line width).' },
+		},
+		example: { type: 'chart', kind: 'graph', title: 'Service deps', data: [{ a: 'web', b: 'api' }, { a: 'api', b: 'db' }, { a: 'api', b: 'cache' }], encoding: { source: 'a', target: 'b' } },
+	},
+	treemap: {
+		summary: 'Nested rectangles sized by value.',
+		whenToUse: 'Hierarchical part-of-whole: disk usage, budget breakdown.',
+		data: 'A TREE: array of {name, value, children?: [...]} nodes (rename keys via encoding).',
+		aliases: ['hierarchy', 'rectangles'],
+		encoding: {
+			name: { type: 'key', default: 'name', description: 'Key for node names (default "name").' },
+			value: { type: 'key', default: 'value', description: 'Key for node sizes (default "value").' },
+			children: { type: 'key', default: 'children', checkInData: false, description: 'Key for child arrays (default "children").' },
+		},
+		example: { type: 'chart', kind: 'treemap', title: 'Disk usage', data: [{ name: 'src', value: 120, children: [{ name: 'web', value: 80 }, { name: 'lib', value: 40 }] }, { name: 'assets', value: 300 }] },
+	},
+	sunburst: {
+		summary: 'Hierarchy as concentric rings.',
+		whenToUse: 'Same data as treemap when depth matters more than area.',
+		data: 'A TREE: array of {name, value, children?: [...]} nodes (rename keys via encoding).',
+		aliases: ['rings', 'wheel'],
+		encoding: {
+			name: { type: 'key', default: 'name', description: 'Key for node names (default "name").' },
+			value: { type: 'key', default: 'value', description: 'Key for node sizes (default "value").' },
+			children: { type: 'key', default: 'children', checkInData: false, description: 'Key for child arrays (default "children").' },
+		},
+		example: { type: 'chart', kind: 'sunburst', title: 'Org', data: [{ name: 'Eng', value: 40, children: [{ name: 'Platform', value: 15 }, { name: 'Product', value: 25 }] }, { name: 'Sales', value: 20 }] },
+	},
+	parallel: {
+		summary: 'Each row drawn as a line across several vertical numeric axes.',
+		whenToUse: 'Comparing many items across 3+ metrics at once (multivariate).',
+		data: 'One row per item; one numeric property per axis.',
+		aliases: ['multivariate', 'coordinates'],
+		encoding: {
+			dimensions: { type: 'keys', required: true, description: 'List of numeric keys — one vertical axis each.' },
+			name: { type: 'key', description: 'Optional key naming each line (tooltip).' },
+		},
+		example: { type: 'chart', kind: 'parallel', title: 'Models', data: [{ model: 'A', speed: 90, cost: 60, quality: 85 }, { model: 'B', speed: 70, cost: 95, quality: 78 }], encoding: { dimensions: ['speed', 'cost', 'quality'], name: 'model' } },
+	},
+	themeRiver: {
+		summary: 'Stacked stream flowing over time.',
+		whenToUse: 'How category composition shifts over time, organic look.',
+		data: 'One row per (date, category) pair with a numeric value. x must be a DATE string (e.g. "2026-07-01") — the stream axis is time-based.',
+		aliases: ['stream', 'streamgraph', 'river'],
+		encoding: {
+			x: { type: 'key', required: true, description: 'Key for the date (e.g. "2026-07-01"). Must parse as a date.' },
+			series: { type: 'key', required: true, description: 'Key for the stream (category) name.' },
+			value: { type: 'key', required: true, description: 'Key for the numeric value.' },
+		},
+		example: { type: 'chart', kind: 'themeRiver', title: 'Topics', data: [{ day: '2026-07-01', topic: 'bugs', n: 12 }, { day: '2026-07-01', topic: 'features', n: 6 }, { day: '2026-07-02', topic: 'bugs', n: 8 }, { day: '2026-07-02', topic: 'features', n: 14 }], encoding: { x: 'day', series: 'topic', value: 'n' } },
+	},
+}
+
+// ECharts kinds deliberately NOT supported (documented so agents don't guess):
+const UNSUPPORTED_CHARTS = {
+	map: 'Needs GeoJSON map registration (external asset) — not available in the vendored runtime.',
+	lines: 'Geo trajectory chart — needs coordinate systems/maps.',
+	effectScatter: 'Visual variant of scatter — use kind "scatter" and refine via the raw "options" escape hatch.',
+	pictorialBar: 'Symbol-based bars — use kind "bar" and refine via the raw "options" escape hatch.',
+	custom: 'Requires JavaScript renderItem functions; canvases are pure JSON.',
+}
+
 // The 16 field types. aliases feed "Did you mean" hints for unknown types.
 const FIELD_TYPES = {
 	text: { description: 'Single-line text input.', serialization: 'string', aliases: ['string', 'input'] },
@@ -168,18 +384,18 @@ const BLOCKS = {
 	},
 	chart: {
 		kind: 'display',
-		description: 'ECharts chart. Kinds: line, bar, pie (pie supports "donut": true). Data is an inline array of flat objects; "encoding" maps keys to channels; "options" is a raw ECharts option object deep-merged last (escape hatch).',
-		aliases: ['graph', 'plot', 'line', 'bar', 'pie'],
+		description: 'ECharts chart. 17 kinds (see the catalog "chartKinds" index; `catalog <kind>` gives each kind\'s exact encoding schema + example). Data is inline JSON; "encoding" maps data keys to visual channels per kind; "options" is a raw ECharts option applied last (escape hatch).',
+		aliases: ['graph', 'plot', 'diagram', 'visualization'],
 		properties: {
 			type: { type: 'string', required: true, enum: ['chart'] },
-			kind: { type: 'string', required: true, enum: ['line', 'bar', 'pie'], description: 'Chart kind.' },
+			kind: { type: 'string', required: true, enum: [], description: 'Chart kind — run `catalog` for the one-line index, `catalog <kind>` for its schema.' }, // enum filled below
 			title: { type: 'string', description: 'Card title.', example: 'Signups' },
 			description: { type: 'string', description: 'Caption under the title.', example: 'Actual vs. target, last 4 months' },
-			data: { type: 'array', required: true, description: 'Array of flat objects (wide format), inline.', example: [{ month: 'Apr', signups: 2000, target: 2200 }] },
-			encoding: { type: 'object', required: true, itemShape: 'chartEncoding', description: 'line/bar: {x, y (string or string[])}; pie: {category, value}. Every key must exist in data[0].' },
-			format: { type: 'object', itemShape: 'chartFormat', description: 'Axis/tooltip formatting.' },
+			data: { type: 'array', required: true, description: 'Inline data rows. Shape depends on kind: flat objects for most; {name, value, children} trees for treemap/sunburst; link rows for sankey/graph.', example: [{ month: 'Apr', signups: 2000, target: 2200 }] },
+			encoding: { type: 'object', description: 'Maps data keys to the kind\'s channels — exact schema via `catalog <kind>`. Optional only for treemap/sunburst (default name/value/children keys).' },
+			format: { type: 'object', itemShape: 'chartFormat', description: 'Value/axis/tooltip formatting.' },
 			donut: { type: 'boolean', default: false, description: 'Pie only: render as a donut.' },
-			options: { type: 'object', description: 'Raw ECharts option, deep-merged LAST over the generated option. JSON only.', example: {} },
+			options: { type: 'object', description: 'Raw ECharts option applied LAST with native merge semantics (escape hatch). JSON only.', example: {} },
 		},
 		example: { type: 'chart', kind: 'line', title: 'Signups', data: [{ month: 'Apr', signups: 2000, target: 2200 }], encoding: { x: 'month', y: ['signups', 'target'] }, format: { y: 'number' } },
 	},
@@ -238,6 +454,8 @@ const BLOCKS = {
 	},
 }
 
+BLOCKS.chart.properties.kind.enum = Object.keys(CHART_KINDS)
+
 const ENVELOPE = {
 	description: 'A canvas file: one renderable document. Top level must carry "instantcanvas": 1 (the marker doubles as the discriminator during workspace scans). EXACTLY ONE of "blocks" or "pages".',
 	properties: {
@@ -259,4 +477,4 @@ const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
 // Accepted URL schemes for "url" fields unless validation.protocols narrows them.
 const DEFAULT_URL_PROTOCOLS = ['http', 'https', 'ftp', 'ftps', 'sftp', 'ws', 'wss', 'file', 'mailto']
 
-module.exports = { VERSION, ENVELOPE, BLOCKS, FIELD_TYPES, SHAPES, ENV_KEY_RE, DEFAULT_URL_PROTOCOLS }
+module.exports = { VERSION, ENVELOPE, BLOCKS, FIELD_TYPES, CHART_KINDS, UNSUPPORTED_CHARTS, SHAPES, ENV_KEY_RE, DEFAULT_URL_PROTOCOLS }

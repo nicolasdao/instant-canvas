@@ -34,7 +34,8 @@ Commands:
       Render a canvas in the browser. Display canvases return immediately;
       interactive canvases (form/confirm) block until the human responds.
   validate <canvas.json>       Validate a canvas file, print JSON verdict.
-  catalog [name]               Print the machine-readable block/field contract.
+  catalog [name] [--full]      Lean index; <name> = block | chart kind | field
+                               type | fieldset | envelope for ONE full schema.
   status [--workspace <dir>]   Report the workspace kernel state.
   stop [--workspace <dir>]     Stop the workspace kernel.
 
@@ -80,6 +81,7 @@ function parseArgs(argv) {
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i]
 		if (a === '--no-open') args.noOpen = true
+		else if (a === '--full') args.full = true
 		else if (a === '--workspace') args.workspace = argv[++i]
 		else if (a === '--timeout') args.timeout = Number(argv[++i])
 		else if (a === '--result') args.result = argv[++i]
@@ -280,7 +282,7 @@ function cmdValidate(args) {
 
 function cmdCatalog(args) {
 	try {
-		out(catalog(args._[0]), 0)
+		out(catalog(args.full ? '--full' : args._[0]), 0)
 	} catch (err) {
 		if (err.code === 'INVALID_SPEC')
 			specError('INVALID_SPEC', err.message)

@@ -307,44 +307,262 @@ function renderTable(block) {
 	return `<div class="block card">${title}<table class="tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`
 }
 
+
 function chartOption(block) {
 	const fmt = block.format || {}
 	const yFmt = (v) => fmtValue(v, fmt.y || 'number', fmt.currency)
-	let option
-	if (block.kind === 'pie') {
-		const data = (block.data || []).map((r) => ({ name: r[block.encoding.category], value: r[block.encoding.value] }))
-		option = {
-			tooltip: { trigger: 'item', formatter: (p) => `${esc(p.name)}: ${yFmt(p.value)} (${p.percent}%)` },
-			legend: { bottom: 0, type: 'scroll' },
-			series: [{
-				type: 'pie',
-				radius: block.donut ? ['45%', '70%'] : '70%',
-				center: ['50%', '46%'],
-				data,
-				label: { show: false },
-				emphasis: { label: { show: true, formatter: '{b}' } },
-				itemStyle: { borderRadius: 4, borderWidth: 2, borderColor: 'transparent' },
-			}],
+	const rows = block.data || []
+	const enc = block.encoding || {}
+	const palette = currentTheme() === 'dark' ? DARK : LIGHT
+	const uniq = (key) => [...new Set(rows.map((r) => r[key]))]
+	const bottomLegend = { bottom: 0, type: 'scroll' }
+	const grid = (legend) => ({ left: 8, right: 16, top: 18, bottom: legend ? 42 : 16, containLabel: true })
+
+	switch (block.kind) {
+		case 'line':
+		case 'area':
+		case 'bar': {
+			const ys = Array.isArray(enc.y) ? enc.y : [enc.y]
+			const multi = ys.length > 1
+			return {
+				tooltip: { trigger: 'axis', valueFormatter: yFmt },
+				legend: multi ? bottomLegend : { show: false },
+				grid: grid(multi),
+				xAxis: { type: 'category', data: rows.map((r) => r[enc.x]), boundaryGap: block.kind === 'bar' },
+				yAxis: { type: 'value', axisLabel: { formatter: yFmt } },
+				series: ys.map((key) => ({
+					name: key,
+					type: block.kind === 'bar' ? 'bar' : 'line',
+					data: rows.map((r) => r[key]),
+					...(enc.stack ? { stack: 'total' } : {}),
+					...(block.kind === 'bar'
+						? { barMaxWidth: 46, itemStyle: { borderRadius: enc.stack ? 0 : [3, 3, 0, 0] } }
+						: { symbolSize: 7, lineStyle: { width: 2.5 }, ...(block.kind === 'area' ? { areaStyle: { opacity: 0.25 }, symbolSize: 5 } : {}) }),
+				})),
+			}
 		}
-	} else {
-		const ys = Array.isArray(block.encoding.y) ? block.encoding.y : [block.encoding.y]
-		const categories = (block.data || []).map((r) => r[block.encoding.x])
-		const multi = ys.length > 1
-		option = {
-			tooltip: { trigger: 'axis', valueFormatter: yFmt },
-			legend: multi ? { bottom: 0, type: 'scroll' } : { show: false },
-			grid: { left: 8, right: 16, top: 18, bottom: multi ? 42 : 16, containLabel: true },
-			xAxis: { type: 'category', data: categories, boundaryGap: block.kind === 'bar' },
-			yAxis: { type: 'value', axisLabel: { formatter: yFmt } },
-			series: ys.map((key) => ({
-				name: key,
-				type: block.kind,
-				data: (block.data || []).map((r) => r[key]),
-				...(block.kind === 'line' ? { symbolSize: 7, lineStyle: { width: 2.5 } } : { barMaxWidth: 46, itemStyle: { borderRadius: [3, 3, 0, 0] } }),
-			})),
+		case 'pie':
+			return {
+				tooltip: { trigger: 'item', formatter: (p) => `${esc(p.name)}: ${yFmt(p.value)} (${p.percent}%)` },
+				legend: bottomLegend,
+				series: [{
+					type: 'pie',
+					radius: block.donut ? ['45%', '70%'] : '70%',
+					center: ['50%', '46%'],
+					data: rows.map((r) => ({ name: r[enc.category], value: r[enc.value] })),
+					label: { show: false },
+					emphasis: { label: { show: true, formatter: '{b}' } },
+					itemStyle: { borderRadius: 4, borderWidth: 2, borderColor: 'transparent' },
+				}],
+			}
+		case 'scatter': {
+			const groups = enc.series ? uniq(enc.series) : [null]
+			let sizeScale = null
+			if (enc.size) {
+				const sizes = rows.map((r) => Number(r[enc.size])).filter(Number.isFinite)
+				const lo = Math.min(...sizes), hi = Math.max(...sizes)
+				sizeScale = (v) => 8 + (hi > lo ? ((v - lo) / (hi - lo)) * 30 : 10)
+			}
+			return {
+				tooltip: {
+					trigger: 'item',
+					formatter: (p) => `${p.data.name ? esc(p.data.name) + '<br>' : ''}${esc(enc.x)}: ${p.value[0]} · ${esc(enc.y)}: ${p.value[1]}${enc.size ? ' · ' + esc(enc.size) + ': ' + p.data.sizeValue : ''}`,
+				},
+				legend: groups[0] !== null ? bottomLegend : { show: false },
+				grid: grid(groups[0] !== null),
+				xAxis: { type: 'value', scale: true, name: enc.x },
+				yAxis: { type: 'value', scale: true, name: enc.y },
+				series: groups.map((g) => ({
+					name: g === null ? enc.y : String(g),
+					type: 'scatter',
+					data: rows.filter((r) => g === null || r[enc.series] === g).map((r) => ({
+						value: [r[enc.x], r[enc.y]],
+						...(enc.label ? { name: r[enc.label] } : {}),
+						...(enc.size ? { sizeValue: r[enc.size], symbolSize: sizeScale(Number(r[enc.size])) } : {}),
+					})),
+					...(enc.size ? {} : { symbolSize: 11 }),
+				})),
+			}
 		}
+		case 'heatmap': {
+			const xs = uniq(enc.x), ys = uniq(enc.y)
+			const values = rows.map((r) => Number(r[enc.value])).filter(Number.isFinite)
+			return {
+				tooltip: { formatter: (p) => `${esc(String(ys[p.value[1]]))} · ${esc(String(xs[p.value[0]]))}: ${yFmt(p.value[2])}` },
+				grid: { left: 8, right: 16, top: 18, bottom: 64, containLabel: true },
+				xAxis: { type: 'category', data: xs },
+				yAxis: { type: 'category', data: ys },
+				visualMap: {
+					min: Math.min(...values), max: Math.max(...values),
+					orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 12, itemHeight: 90,
+					inRange: { color: [currentTheme() === 'dark' ? '#20233a' : '#eef0fe', palette.color[0]] },
+				},
+				series: [{
+					type: 'heatmap',
+					data: rows.map((r) => [xs.indexOf(r[enc.x]), ys.indexOf(r[enc.y]), r[enc.value]]),
+					label: { show: rows.length <= 120, formatter: (p) => yFmt(p.value[2]) },
+					itemStyle: { borderRadius: 3, borderWidth: 2, borderColor: 'transparent' },
+				}],
+			}
+		}
+		case 'radar': {
+			const dims = Array.isArray(enc.dimensions) ? enc.dimensions : [enc.dimensions]
+			return {
+				tooltip: { trigger: 'item' },
+				legend: enc.name ? bottomLegend : { show: false },
+				radar: {
+					indicator: dims.map((d) => ({ name: d, max: Math.max(...rows.map((r) => Number(r[d]) || 0)) * 1.15 || 1 })),
+					radius: '62%',
+				},
+				series: [{
+					type: 'radar',
+					data: rows.map((r) => ({ value: dims.map((d) => r[d]), name: enc.name ? String(r[enc.name]) : '' })),
+					areaStyle: { opacity: 0.15 },
+					symbolSize: 5,
+				}],
+			}
+		}
+		case 'funnel':
+			return {
+				tooltip: { trigger: 'item', formatter: (p) => `${esc(p.name)}: ${yFmt(p.value)}` },
+				legend: bottomLegend,
+				series: [{
+					type: 'funnel',
+					top: 8, bottom: 36, left: '12%', width: '76%',
+					sort: 'descending', gap: 3,
+					label: { show: true, position: 'inside', formatter: '{b}' },
+					data: rows.map((r) => ({ name: r[enc.category], value: r[enc.value] })),
+				}],
+			}
+		case 'gauge': {
+			const row = rows[0] || {}
+			const min = typeof enc.min === 'number' ? enc.min : 0
+			const max = typeof enc.max === 'number' ? enc.max : 100
+			return {
+				series: [{
+					type: 'gauge',
+					min, max,
+					startAngle: 210, endAngle: -30,
+					progress: { show: true, width: 14 },
+					axisLine: { lineStyle: { width: 14 } },
+					axisTick: { show: false },
+					splitLine: { length: 8 },
+					pointer: { length: '60%', width: 5 },
+					title: { fontSize: 13, offsetCenter: [0, '68%'] },
+					detail: { valueAnimation: true, fontSize: 22, offsetCenter: [0, '40%'], formatter: (v) => yFmt(v) },
+					data: [{ value: row[enc.value], name: enc.name ? String(row[enc.name] ?? '') : '' }],
+				}],
+			}
+		}
+		case 'candlestick':
+			return {
+				tooltip: { trigger: 'axis' },
+				grid: grid(false),
+				xAxis: { type: 'category', data: rows.map((r) => r[enc.x]) },
+				yAxis: { type: 'value', scale: true, axisLabel: { formatter: yFmt } },
+				series: [{
+					type: 'candlestick',
+					data: rows.map((r) => [r[enc.open], r[enc.close], r[enc.low], r[enc.high]]),
+				}],
+			}
+		case 'boxplot':
+			return {
+				tooltip: {
+					formatter: (p) => `${esc(p.name)}<br>max: ${yFmt(p.value[5])}<br>q3: ${yFmt(p.value[4])}<br>median: ${yFmt(p.value[3])}<br>q1: ${yFmt(p.value[2])}<br>min: ${yFmt(p.value[1])}`,
+				},
+				grid: grid(false),
+				xAxis: { type: 'category', data: rows.map((r) => r[enc.x]) },
+				yAxis: { type: 'value', scale: true, axisLabel: { formatter: yFmt } },
+				series: [{
+					type: 'boxplot',
+					itemStyle: { borderWidth: 1.5 },
+					data: rows.map((r) => [r[enc.min], r[enc.q1], r[enc.median], r[enc.q3], r[enc.max]]),
+				}],
+			}
+		case 'sankey': {
+			const names = [...new Set(rows.flatMap((r) => [r[enc.source], r[enc.target]]))]
+			return {
+				tooltip: { trigger: 'item', formatter: (p) => p.dataType === 'edge' ? `${esc(p.data.source)} → ${esc(p.data.target)}: ${yFmt(p.data.value)}` : esc(p.name) },
+				series: [{
+					type: 'sankey',
+					top: 10, bottom: 14, left: 4, right: 90,
+					data: names.map((n) => ({ name: String(n) })),
+					links: rows.map((r) => ({ source: String(r[enc.source]), target: String(r[enc.target]), value: r[enc.value] })),
+					lineStyle: { color: 'gradient', opacity: 0.35, curveness: 0.5 },
+					itemStyle: { borderRadius: 3 },
+				}],
+			}
+		}
+		case 'graph': {
+			const degree = {}
+			rows.forEach((r) => {
+				degree[r[enc.source]] = (degree[r[enc.source]] || 0) + 1
+				degree[r[enc.target]] = (degree[r[enc.target]] || 0) + 1
+			})
+			return {
+				tooltip: { trigger: 'item' },
+				series: [{
+					type: 'graph',
+					layout: 'force',
+					roam: true,
+					force: { repulsion: 220, edgeLength: 90, gravity: 0.12 },
+					label: { show: true, fontSize: 11 },
+					data: Object.keys(degree).map((n) => ({ name: String(n), symbolSize: Math.min(40, 12 + degree[n] * 5) })),
+					links: rows.map((r) => ({
+						source: String(r[enc.source]), target: String(r[enc.target]),
+						...(enc.value !== undefined && r[enc.value] !== undefined ? { value: r[enc.value], lineStyle: { width: 1 + Math.log(1 + Number(r[enc.value])) } } : {}),
+					})),
+					lineStyle: { opacity: 0.5, curveness: 0.1 },
+				}],
+			}
+		}
+		case 'treemap':
+		case 'sunburst': {
+			const nk = enc.name || 'name', vk = enc.value || 'value', ck = enc.children || 'children'
+			const mapTree = (nodes) => (nodes || []).map((n) => ({
+				name: n[nk], value: n[vk],
+				...(Array.isArray(n[ck]) && n[ck].length ? { children: mapTree(n[ck]) } : {}),
+			}))
+			const data = mapTree(rows)
+			return block.kind === 'treemap'
+				? {
+					tooltip: { formatter: (p) => `${esc(p.name)}: ${yFmt(p.value)}` },
+					series: [{ type: 'treemap', data, top: 6, bottom: 26, left: 4, right: 4, roam: false, breadcrumb: { bottom: 0 }, label: { fontSize: 12 }, itemStyle: { borderRadius: 3, gapWidth: 2 } }],
+				}
+				: {
+					tooltip: { formatter: (p) => `${esc(p.name)}: ${yFmt(p.value)}` },
+					series: [{ type: 'sunburst', data, radius: ['14%', '82%'], label: { rotate: 'radial', fontSize: 11, minAngle: 8 }, itemStyle: { borderRadius: 4, borderWidth: 1.5 } }],
+				}
+		}
+		case 'parallel': {
+			const dims = Array.isArray(enc.dimensions) ? enc.dimensions : [enc.dimensions]
+			return {
+				tooltip: { trigger: 'item', formatter: (p) => `${p.data.name ? esc(p.data.name) + '<br>' : ''}${dims.map((d, i) => `${esc(d)}: ${p.value[i]}`).join('<br>')}` },
+				parallel: { top: 34, bottom: 18, left: 40, right: 40 },
+				parallelAxis: dims.map((d, i) => ({ dim: i, name: d })),
+				series: [{
+					type: 'parallel',
+					lineStyle: { width: 2.5, opacity: 0.65 },
+					emphasis: { lineStyle: { width: 4, opacity: 1 } },
+					data: rows.map((r) => ({ value: dims.map((d) => r[d]), ...(enc.name ? { name: String(r[enc.name]) } : {}) })),
+				}],
+			}
+		}
+		case 'themeRiver':
+			return {
+				tooltip: { trigger: 'axis', axisPointer: { type: 'line' } },
+				legend: bottomLegend,
+				singleAxis: { type: 'time', top: 20, bottom: 60 },
+				series: [{
+					type: 'themeRiver',
+					top: 20, bottom: 60,
+					data: rows.map((r) => [r[enc.x], r[enc.value], String(r[enc.series])]),
+					label: { show: false },
+				}],
+			}
+		default:
+			return { title: { text: `Unsupported chart kind: ${String(block.kind)}`, left: 'center', top: 'middle', textStyle: { fontSize: 13 } } }
 	}
-	return option
 }
 
 function renderChartShell(block, idx) {

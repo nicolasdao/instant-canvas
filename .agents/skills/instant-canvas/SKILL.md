@@ -24,12 +24,14 @@ Never ask the user to paste API keys, tokens, passwords, database URLs, or crede
 
 Honest framing: this keeps secrets out of the conversation **during capture**. Nothing technically stops a later `cat .env` — the rule above is what protects the user. Follow it.
 
-## The agentic loop
+## The agentic loop (progressive disclosure — pull only what you need)
 
-1. Write a canvas file: `<name>.canvas.json` with `"instantcanvas": 1` at the top level, inside the user's workspace.
-2. `$IC validate <file>` — or let `open` validate. On exit 1, read `errors[]` (each has `code`, `path`, `message`, often `hint` + `example`), fix, retry.
-3. `$IC open <file> [--workspace <dir>]` — display canvases return immediately; form/confirm canvases **block** until the human responds in the browser.
-4. Parse the single JSON document on stdout (logs go to stderr) and continue from that metadata only.
+1. **Browse lean**: `$IC catalog` prints a compact index — one-liners for every block, chart kind, and field type, plus when to use each. No schemas. Skip this step if you already know what you want.
+2. **Pull exact schemas, one at a time**: `$IC catalog <name>` where name is a block (`chart`, `form`, …), a **chart kind** (`sankey`, `heatmap`, `scatter`, …), a field type (`secret`, `range`, …), `fieldset`, or `envelope`. Each returns that thing's full contract: encoding/properties, data shape, and a complete working example. Do NOT use `catalog --full` unless you truly need everything.
+3. **Write** the canvas: `<name>.canvas.json` with `"instantcanvas": 1` at the top level, inside the user's workspace.
+4. **Validate deterministically**: `$IC validate <file>`. On exit 1, read `errors[]` — each has `code`, `path`, `message`, and usually a `hint` ("Did you mean …") and a correct `example`. Fix and re-validate until `{"ok": true}`. `open` also refuses invalid canvases with the same errors.
+5. **Open**: `$IC open <file> [--workspace <dir>]` — display canvases return immediately; form/confirm canvases **block** until the human responds in the browser.
+6. Parse the single JSON document on stdout (logs go to stderr) and continue from that metadata only.
 
 ## Commands
 
@@ -59,7 +61,7 @@ stop [--workspace <dir>]
 
 ## Block quick reference
 
-Run `$IC catalog` (or `catalog chart`, `catalog secret`, …) for the exact contract. Display blocks; any canvas may contain **at most one** interactive block (`form` or `confirm`):
+Any canvas may contain **at most one** interactive block (`form` or `confirm`). Exact contracts live in the catalog — pull them one at a time:
 
 ```jsonc
 {"type": "markdown", "text": "## Hi **there**"}                    // or "src": "notes/x.md" (inside workspace)
@@ -67,11 +69,11 @@ Run `$IC catalog` (or `catalog chart`, `catalog secret`, …) for the exact cont
 {"type": "kpi", "cards": [{"label": "Revenue", "value": 128000, "format": "currency",
   "delta": {"value": 0.12, "label": "QoQ", "positiveIs": "up"}}]}
 
-{"type": "chart", "kind": "line",                                   // line | bar | pie (+ "donut": true)
-  "data": [{"month": "Apr", "signups": 2000, "target": 2200}],      // flat objects, wide format
-  "encoding": {"x": "month", "y": ["signups", "target"]},           // pie: {"category": ..., "value": ...}
+{"type": "chart", "kind": "line",                                   // 17 kinds — see below
+  "data": [{"month": "Apr", "signups": 2000, "target": 2200}],
+  "encoding": {"x": "month", "y": ["signups", "target"]},           // channels differ per kind
   "format": {"y": "number"},                                        // number | currency | percent
-  "options": {}}                                                     // raw ECharts option, merged last
+  "options": {}}                                                     // raw ECharts option, applied last
 
 {"type": "table", "columns": [{"key": "customer", "label": "Customer"},
   {"key": "rev", "label": "Revenue", "format": "currency"}],
@@ -86,6 +88,12 @@ Run `$IC catalog` (or `catalog chart`, `catalog secret`, …) for the exact cont
   "details": [{"label": "Target", "value": "postgres://localhost/app"}],
   "confirmLabel": "Drop & recreate"}
 ```
+
+## Charts — 17 kinds
+
+`line area bar pie(+donut) scatter heatmap radar funnel gauge candlestick boxplot sankey graph treemap sunburst parallel themeRiver`
+
+Pick from the one-line index (`$IC catalog` → `chartKinds`, with when-to-use guidance), then pull the winner's exact schema: `$IC catalog sankey` returns its encoding channels, expected data shape, and a complete example. Each kind validates deterministically — wrong or missing encoding keys come back as `ENCODING_KEY_NOT_IN_DATA` / `MISSING_REQUIRED_PROPERTY` with hints. ECharts kinds that need external assets or JS functions (`map`, `custom`, …) are intentionally unsupported and listed with reasons under `unsupportedChartKinds`; the raw `options` escape hatch refines any supported kind.
 
 16 field types: `text textarea secret email url tel number date datetime select radio checkbox checkboxGroup range hidden readonly`. Common shape: `{name, label, type, required?, placeholder?, help?, default?, options?, validation?, ui?, span?}` with `validation: {minLength, maxLength, pattern, patternMessage, min, max, step, protocols}`. Env destinations require names matching `^[A-Za-z_][A-Za-z0-9_]*$`.
 

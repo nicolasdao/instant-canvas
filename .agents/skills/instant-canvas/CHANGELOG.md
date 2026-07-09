@@ -5,7 +5,8 @@
 InstantCanvas MVP — local, schema-driven interaction runtime for coding agents.
 
 ### Added
-- **Canvas contract**: envelope (`"instantcanvas": 1`, `blocks` XOR `pages`), 6 block types (`markdown`, `kpi`, `chart` line/bar/pie+donut, `table`, `form`, `confirm`), 16 form field types; declarative schema registry as single source of truth for both the validator and `catalog`.
+- **Canvas contract**: envelope (`"instantcanvas": 1`, `blocks` XOR `pages`), 6 block types (`markdown`, `kpi`, `chart`, `table`, `form`, `confirm`), **17 chart kinds** (line, area, bar, pie+donut, scatter, heatmap, radar, funnel, gauge, candlestick, boxplot, sankey, graph, treemap, sunburst, parallel, themeRiver — each with its own encoding schema, when-to-use guidance and validated example; asset/function-dependent ECharts kinds documented as unsupported), 16 form field types; declarative schema registry as single source of truth for the validator and `catalog`.
+- **Progressive-disclosure catalog**: bare `catalog` prints a ~4 KB lean index (one-liners only); `catalog <name>` returns ONE full schema (block, chart kind, field type, `fieldset`, `envelope`); `catalog --full` dumps everything.
 - **Validator**: collects all errors in one pass with humanized messages, `Did you mean` hints (alias + Levenshtein), examples, and warnings for unknown properties.
 - **CLI** (`open` / `validate` / `catalog` / `status` / `stop`): stdout is exactly one JSON document, logs on stderr through the redaction layer; display canvases return immediately, form/confirm canvases block until the human responds in the browser.
 - **Per-workspace kernel**: 127.0.0.1-only, per-kernel token (timing-safe compare), Host-header check, CSP, hand-rolled RFC 6455 WebSocket hot reload, idle auto-shutdown, health-ping registry with stale-entry recovery.
