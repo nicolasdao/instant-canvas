@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InstantCanvas — prototype</title>
+<style>
+  :root{
+    --bg:#f4f5f8; --panel:#ffffff; --panel-2:#fafbfc; --text:#1a1d24; --muted:#6b7280;
+    --border:#e6e8ec; --border-2:#eef0f3; --accent:#6366f1; --accent-soft:#eef0fe;
+    --green:#10b981; --amber:#f59e0b; --red:#ef4444; --shadow:0 1px 2px rgba(16,20,30,.06),0 8px 24px rgba(16,20,30,.06);
+    --c1:#6366f1; --c2:#10b981; --c3:#f59e0b; --c4:#ec4899; --c5:#06b6d4;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1014; --panel:#161922; --panel-2:#1b1f29; --text:#e7e9ee; --muted:#98a0ad;
+    --border:#242a35; --border-2:#1f242e; --accent:#818cf8; --accent-soft:#20233a;
+    --green:#34d399; --amber:#fbbf24; --red:#f87171; --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);
+    --c1:#818cf8; --c2:#34d399; --c3:#fbbf24; --c4:#f472b6; --c5:#22d3ee;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme]){
+      --bg:#0e1014; --panel:#161922; --panel-2:#1b1f29; --text:#e7e9ee; --muted:#98a0ad;
+      --border:#242a35; --border-2:#1f242e; --accent:#818cf8; --accent-soft:#20233a;
+      --green:#34d399; --amber:#fbbf24; --red:#f87171; --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);
+      --c1:#818cf8; --c2:#34d399; --c3:#fbbf24; --c4:#f472b6; --c5:#22d3ee;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  button{font:inherit;cursor:pointer}
+
+  /* layout */
+  .app{display:flex;flex-direction:column;height:100vh}
+  .topbar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel);
+    border-bottom:1px solid var(--border);flex:0 0 auto}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:650;letter-spacing:-.01em}
+  .brand .logo{width:20px;height:20px;border-radius:50%;
+    background:conic-gradient(var(--accent) 50%, transparent 50%);border:2px solid var(--accent)}
+  .rootpath{color:var(--muted);font-size:12.5px;padding:3px 8px;border:1px solid var(--border);
+    border-radius:7px;background:var(--panel-2)}
+  .spacer{flex:1}
+  .tbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:8px;
+    border:1px solid var(--border);background:var(--panel);color:var(--text)}
+  .tbtn:hover{background:var(--panel-2)}
+  .tbtn.primary{background:var(--accent);color:#fff;border-color:transparent}
+  .tbtn.icon{padding:6px 9px}
+
+  .body{display:flex;flex:1;min-height:0}
+  /* sidebar */
+  .sidebar{width:260px;flex:0 0 260px;background:var(--panel);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;overflow:hidden}
+  .side-head{padding:14px 16px 8px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+  .tree{flex:1;overflow:auto;padding:0 8px 10px}
+  .group{margin-bottom:2px}
+  .group-row{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;color:var(--muted);
+    font-weight:600;font-size:12.5px;user-select:none;cursor:pointer}
+  .group-row:hover{background:var(--panel-2);color:var(--text)}
+  .group-row .caret{transition:transform .12s;font-size:10px;opacity:.7}
+  .group.collapsed .caret{transform:rotate(-90deg)}
+  .group.collapsed .items{display:none}
+  .item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 26px;border-radius:7px;
+    color:var(--text);cursor:pointer;font-size:13px}
+  .item:hover{background:var(--panel-2)}
+  .item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .item .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex:0 0 6px}
+  .side-foot{padding:10px 16px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px}
+  .side-foot .watch{display:flex;align-items:center;gap:6px;margin-top:4px}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 var(--green);
+    animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 7px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+
+  /* main */
+  .main{flex:1;overflow:auto;min-width:0}
+  .canvas{max-width:860px;margin:0 auto;padding:28px 32px 80px}
+  .canvas-head h1{margin:0 0 4px;font-size:22px;letter-spacing:-.02em}
+  .canvas-head .sub{color:var(--muted);font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .tabs{display:flex;gap:2px;margin:18px 0 6px;border-bottom:1px solid var(--border)}
+  .tab{padding:8px 14px;border:none;background:none;color:var(--muted);font-weight:600;font-size:13px;
+    border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent)}
+  .tab:hover{color:var(--text)}
+
+  /* blocks */
+  .block{margin:22px 0}
+  .md h2{font-size:16px;margin:24px 0 6px;letter-spacing:-.01em}
+  .md h3{font-size:13.5px;margin:20px 0 6px;color:var(--muted);text-transform:none;letter-spacing:0}
+  .md p{margin:6px 0;color:var(--text)}
+  .md strong{font-weight:650}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .kpi .label{color:var(--muted);font-size:12px}
+  .kpi .value{font-size:24px;font-weight:680;letter-spacing:-.02em;margin:4px 0 2px}
+  .kpi .delta{font-size:12px;font-weight:600}
+  .kpi .delta.up{color:var(--green)} .kpi .delta.down{color:var(--red)} .kpi .delta.flat{color:var(--muted)}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
+  .chart-title{font-weight:650;font-size:14px;margin:0 0 2px}
+  .chart-desc{color:var(--muted);font-size:12px;margin:0 0 10px}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:20px;border:1px solid var(--border);
+    font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+  .chip .sw{width:9px;height:9px;border-radius:3px}
+  .chip.on{color:var(--text);background:var(--panel-2)}
+  .chip.off{opacity:.45;text-decoration:line-through}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+  table.tbl th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;letter-spacing:.03em;
+    text-transform:uppercase;padding:8px 12px;border-bottom:1px solid var(--border)}
+  table.tbl td{padding:9px 12px;border-bottom:1px solid var(--border-2)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl td.num,table.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* form */
+  .secbanner{display:flex;gap:10px;align-items:flex-start;background:var(--accent-soft);border:1px solid var(--border);
+    border-radius:10px;padding:12px 14px;margin:8px 0 18px;font-size:13px}
+  .secbanner b{color:var(--accent)}
+  .dest{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .dest code{color:var(--accent)}
+  .field{margin:16px 0}
+  .field label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+  .field .req{color:var(--red)}
+  .field .help{color:var(--muted);font-size:12px;margin-top:5px}
+  .inp{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);
+    color:var(--text);font:inherit}
+  .inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .inp-wrap{position:relative;display:flex;align-items:center}
+  .inp-wrap .eye{position:absolute;right:8px;background:none;border:none;font-size:15px;opacity:.6}
+  .radios{display:flex;gap:16px;flex-wrap:wrap}
+  .radios label{display:flex;align-items:center;gap:7px;font-weight:500}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+  .btn{padding:10px 16px;border-radius:9px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-weight:600}
+  .btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+  .btn.ghost:hover{background:var(--panel-2)}
+
+  /* confirm block */
+  .confirm{border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .confirm.warning{border-color:color-mix(in srgb,var(--amber) 45%,var(--border))}
+  .confirm-head{display:flex;align-items:center;gap:10px;padding:14px 16px;font-weight:650;
+    background:color-mix(in srgb,var(--amber) 12%,var(--panel))}
+  .confirm-body{padding:14px 16px}
+  .confirm-detail{display:flex;gap:12px;font-size:13px;margin:6px 0}
+  .confirm-detail .k{color:var(--muted);width:70px;flex:0 0 70px}
+  .confirm-actions{display:flex;justify-content:flex-end;gap:10px;padding:0 16px 16px}
+
+  /* overlay / success */
+  .overlay{position:fixed;inset:0;background:rgba(10,12,18,.5);display:flex;align-items:center;justify-content:center;
+    z-index:50;backdrop-filter:blur(3px)}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);
+    width:min(560px,92vw);max-height:86vh;overflow:auto}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:650;display:flex;align-items:center;gap:10px}
+  .modal-body{padding:18px 20px}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+  .success-mark{width:52px;height:52px;border-radius:50%;background:color-mix(in srgb,var(--green) 20%,transparent);
+    color:var(--green);display:flex;align-items:center;justify-content:center;font-size:26px;margin:6px auto 14px}
+  .center{text-align:center}
+  .fieldlist{list-style:none;padding:0;margin:12px auto;max-width:300px;text-align:left}
+  .fieldlist li{padding:6px 0;border-bottom:1px solid var(--border-2);font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+  .agentbox{margin-top:16px;background:var(--panel-2);border:1px dashed var(--border);border-radius:10px;padding:12px 14px}
+  .agentbox .cap{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .agentbox pre{margin:0;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--text);white-space:pre-wrap}
+  .agentbox .note{color:var(--muted);font-size:11.5px;margin-top:8px}
+
+  /* folder browser */
+  .fb-crumb{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--muted);margin-bottom:10px}
+  .fb-list{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .fb-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border-2);cursor:pointer}
+  .fb-row:last-child{border-bottom:none}
+  .fb-row:hover{background:var(--panel-2)}
+  .fb-row.sel{background:var(--accent-soft)}
+  .fb-badge{margin-left:auto;font-size:11px;color:var(--green);font-weight:600}
+  .divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px;margin:14px 0}
+  .divider::before,.divider::after{content:"";height:1px;background:var(--border);flex:1}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;color:var(--muted);gap:6px;padding:40px}
+  .empty .big{width:40px;height:40px;border-radius:50%;background:conic-gradient(var(--accent) 50%,transparent 50%);border:3px solid var(--accent);margin-bottom:8px}
+  .placeholder{background:var(--panel-2);border:1px dashed var(--border);border-radius:10px;padding:14px 16px;color:var(--muted);font-size:13px}
+  .placeholder pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--text);max-height:260px;overflow:auto;margin:10px 0 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="logo"></span> InstantCanvas</div>
+    <span class="rootpath" id="rootpath">~/reports</span>
+    <div class="spacer"></div>
+    <button class="tbtn" id="openFolder">📂 Open folder…</button>
+    <button class="tbtn" id="exportBtn">⤓ Export</button>
+    <button class="tbtn icon" id="themeBtn" title="Toggle theme">◐</button>
+    <button class="tbtn icon" title="Stop kernel">⏻</button>
+  </div>
+  <div class="body">
+    <aside class="sidebar">
+      <div class="side-head">WORKSPACE</div>
+      <div class="tree" id="tree"></div>
+      <div class="side-foot">
+        <div id="wsStats">— canvases</div>
+        <div class="watch"><span class="pulse"></span> watching <span id="watchPath">~/reports</span></div>
+      </div>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ *  FAKE DATA  (schema is intentionally ad-hoc — real schema is TBD)   *
+ * ------------------------------------------------------------------ */
+const md = (s)=>({type:"markdown",text:s});
+
+const campaign = {
+  id:"cmp", title:"Q3 Campaign Analysis", file:"marketing/q3-campaign.json",
+  pages:[
+    { name:"Overview", blocks:[
+      md("## Executive summary\nSpend was up **12% QoQ** while CAC held flat. Paid social drove the majority of net-new signups this quarter."),
+      { type:"kpi", cards:[
+        {label:"Spend", value:128000, fmt:"currency", delta:{v:0.12,dir:"up",label:"QoQ"}},
+        {label:"Signups", value:3420, fmt:"number", delta:{v:0.09,dir:"up",label:"QoQ"}},
+        {label:"CAC", value:37.4, fmt:"currency", delta:{v:-0.004,dir:"flat",label:"QoQ"}},
+      ]},
+      md("### Signups by month"),
+      { type:"chart", chartType:"line", desc:"Actual vs. target, last 4 months",
+        categories:["Apr","May","Jun","Jul"], fmt:"number",
+        series:[
+          {name:"Signups", color:"var(--c1)", values:[2000,2500,3000,3420]},
+          {name:"Target",  color:"var(--c3)", values:[2200,2600,2900,3200]},
+        ]},
+      md("### Top channels"),
+      { type:"table",
+        columns:[{k:"channel",label:"Channel"},{k:"signups",label:"Signups",num:true,fmt:"number"},{k:"cac",label:"CAC",num:true,fmt:"currency"}],
+        rows:[
+          {channel:"Paid social", signups:1540, cac:31.2},
+          {channel:"Search", signups:920, cac:44.1},
+          {channel:"Referral", signups:610, cac:12.8},
+          {channel:"Email", signups:350, cac:8.4},
+        ]},
+    ]},
+    { name:"By channel", blocks:[
+      md("## Spend by channel"),
+      { type:"chart", chartType:"bar", categories:["Paid social","Search","Referral","Email"], fmt:"currency",
+        series:[{name:"Spend", color:"var(--c1)", values:[62000,41000,15000,10000]}]},
+    ]},
+    { name:"Cohorts", blocks:[
+      md("## Retention cohorts\nCohort heatmaps land here once we design the `heatmap` block. Placeholder for now."),
+    ]},
+  ]
+};
+
+const funnel = {
+  id:"fnl", title:"Email funnel", file:"marketing/email-funnel.json",
+  pages:[{ name:"Funnel", blocks:[
+    md("## Email funnel — last send"),
+    { type:"chart", chartType:"bar", categories:["Sent","Opened","Clicked","Converted"], fmt:"number",
+      series:[{name:"Users", color:"var(--c2)", values:[42000,18500,4200,860]}]},
+    { type:"table",
+      columns:[{k:"step",label:"Step"},{k:"n",label:"Users",num:true,fmt:"number"},{k:"rate",label:"Rate",num:true,fmt:"percent"}],
+      rows:[{step:"Opened",n:18500,rate:0.44},{step:"Clicked",n:4200,rate:0.227},{step:"Converted",n:860,rate:0.205}]},
+  ]}]
+};
+
+const pipeline = {
+  id:"pipe", title:"Pipeline Q3", file:"sales/pipeline.json",
+  pages:[{ name:"Pipeline", blocks:[
+    md("## Pipeline by stage"),
+    { type:"chart", chartType:"bar", categories:["Lead","Qualified","Proposal","Won"], fmt:"currency",
+      series:[{name:"Value", color:"var(--c5)", values:[480000,320000,190000,95000]}]},
+  ]}]
+};
+
+const anomalies = {
+  id:"anom", title:"Log anomalies", file:"devops/log-anomalies.json",
+  pages:[{ name:"Detection", blocks:[
+    md("## Request latency — baseline vs observed\nToggle a series in the legend to isolate it. Spike around **Jun** flagged as an anomaly."),
+    { type:"chart", chartType:"line", fmt:"number", categories:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+      series:[
+        {name:"Baseline p95", color:"var(--c4)", values:[120,118,125,122,119,121,120]},
+        {name:"Observed p95", color:"var(--c1)", values:[121,119,300,128,122,120,119]},
+      ]},
+  ]}]
+};
+
+const credentials = {
+  id:"cred", title:"Set up environment variables", file:"setup/api-credentials.json",
+  form:{
+    destination:"services/api/.env", mode:"merge",
+    fields:[
+      {name:"OPENAI_API_KEY", label:"OpenAI API Key", type:"secret", required:true, help:"Used for embeddings + chat completion."},
+      {name:"SUPABASE_URL", label:"Supabase URL", type:"text", required:true, placeholder:"https://xxxx.supabase.co"},
+      {name:"SUPABASE_SERVICE_ROLE_KEY", label:"Supabase Service Role Key", type:"secret", required:true},
+      {name:"ENVIRONMENT", label:"Environment", type:"radio", options:["Development","Staging","Production"], value:"Staging"},
+    ]
+  }
+};
+
+const dangerZone = {
+  id:"danger", title:"Reset local database", file:"setup/reset-db.json",
+  confirm:{ severity:"warning", title:"Drop and recreate the local database?",
+    desc:"This deletes all rows in the local Postgres instance and re-runs migrations from scratch.",
+    details:[{k:"Target",v:"postgres://localhost/app_dev"},{k:"Action",v:"DROP SCHEMA public CASCADE; migrate"}],
+    confirmLabel:"Drop & recreate", cancelLabel:"Cancel" }
+};
+
+/* two sample workspaces for the folder-switch demo */
+const WORKSPACES = {
+  "~/reports": { root:"~/reports", groups:[
+    { name:"marketing", canvases:[campaign, funnel] },
+    { name:"sales", canvases:[pipeline] },
+    { name:"devops", canvases:[anomalies] },
+    { name:"setup", canvases:[credentials, dangerZone] },
+  ]},
+  "~/clients": { root:"~/clients", groups:[
+    { name:"acme", canvases:[ {...campaign, id:"acme1", title:"Acme — monthly review", file:"acme/review.json"} ] },
+    { name:"globex", canvases:[ {...funnel, id:"gx1", title:"Globex — email report", file:"globex/email.json"} ] },
+  ]},
+};
+
+/* ------------------------------------------------------------------ *
+ *  STATE + HELPERS                                                    *
+ * ------------------------------------------------------------------ */
+let WS = WORKSPACES["~/reports"];
+let activeId = null, activePage = 0;
+const hidden = new Set();       // legend toggles: key = canvasId:page:chartIdx:series
+const collapsed = new Set();
+
+const esc = (s)=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function fmt(v,kind){
+  if(kind==="currency") return "$"+Number(v).toLocaleString(undefined,{maximumFractionDigits: v%1?2:0});
+  if(kind==="percent") return (v*100).toFixed(1)+"%";
+  if(kind==="number") return Number(v).toLocaleString();
+  return v;
+}
+function findCanvas(id){ for(const g of WS.groups){ const c=g.canvases.find(x=>x.id===id); if(c) return c; } return null; }
+
+/* ------------------------------------------------------------------ *
+ *  SIDEBAR                                                            *
+ * ------------------------------------------------------------------ */
+function renderTree(){
+  const tree = document.getElementById("tree");
+  tree.innerHTML = WS.groups.map(g=>{
+    const isC = collapsed.has(g.name);
+    const items = g.canvases.map(c=>`
+      <div class="item ${c.id===activeId?'active':''}" data-canvas="${c.id}">
+        <span class="dot"></span>${esc(c.title)}
+      </div>`).join("");
+    return `<div class="group ${isC?'collapsed':''}">
+      <div class="group-row" data-group="${esc(g.name)}">
+        <span class="caret">▾</span>📁 ${esc(g.name)}
+      </div>
+      <div class="items">${items}</div>
+    </div>`;
+  }).join("") || `<div style="padding:16px;color:var(--muted)">(no canvases yet)</div>`;
+
+  const n = WS.groups.reduce((a,g)=>a+g.canvases.length,0);
+  document.getElementById("wsStats").textContent = `${n} canvases · ${WS.groups.length} groups`;
+  document.getElementById("rootpath").textContent = WS.root;
+  document.getElementById("watchPath").textContent = WS.root;
+}
+
+/* ------------------------------------------------------------------ *
+ *  BLOCK RENDERERS                                                    *
+ * ------------------------------------------------------------------ */
+function renderMarkdown(b){
+  const html = b.text.split("\n").map(line=>{
+    if(line.startsWith("## ")) return `<h2>${inline(line.slice(3))}</h2>`;
+    if(line.startsWith("### ")) return `<h3>${inline(line.slice(4))}</h3>`;
+    if(line.trim()==="") return "";
+    return `<p>${inline(line)}</p>`;
+  }).join("");
+  return `<div class="block md">${html}</div>`;
+}
+function inline(s){ return esc(s).replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/`(.+?)`/g,"<code>$1</code>"); }
+
+function renderKpi(b){
+  const cards = b.cards.map(c=>{
+    const d=c.delta, sign=d.v>0?"▲":d.v<0?"▼":"–";
+    return `<div class="kpi">
+      <div class="label">${esc(c.label)}</div>
+      <div class="value">${fmt(c.value,c.fmt)}</div>
+      <div class="delta ${d.dir}">${sign} ${Math.abs(d.v*100).toFixed(d.v%1?1:0)}% ${esc(d.label)}</div>
+    </div>`;
+  }).join("");
+  return `<div class="block kpis">${cards}</div>`;
+}
+
+function renderTable(b){
+  const head = b.columns.map(c=>`<th class="${c.num?'num':''}">${esc(c.label)}</th>`).join("");
+  const body = b.rows.map(r=>`<tr>${b.columns.map(c=>
+    `<td class="${c.num?'num':''}">${c.fmt?fmt(r[c.k],c.fmt):esc(r[c.k])}</td>`).join("")}</tr>`).join("");
+  return `<div class="block card"><table class="tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function renderChart(b, idx){
+  const W=720,H=260,padL=54,padR=16,padT=14,padB=34;
+  const pw=W-padL-padR, ph=H-padT-padB, n=b.categories.length;
+  const vis = b.series.filter((s,i)=>!hidden.has(`${activeId}:${activePage}:${idx}:${s.name}`));
+  let max = 0; vis.forEach(s=>s.values.forEach(v=>max=Math.max(max,v))); if(max===0)max=1;
+  const nice = niceMax(max); const y = v=> padT+ph-(v/nice)*ph;
+
+  // gridlines
+  let grid="";
+  for(let i=0;i<=4;i++){ const val=nice*i/4, yy=y(val);
+    grid+=`<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--border)" stroke-width="1"/>
+      <text x="${padL-8}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(val,b.fmt)}</text>`; }
+  // x labels
+  let xlab="";
+  b.categories.forEach((c,i)=>{ const xx = b.chartType==="bar"
+      ? padL+(i+0.5)*(pw/n) : padL+(n===1?pw/2:i*(pw/(n-1)));
+    xlab+=`<text x="${xx}" y="${H-12}" text-anchor="middle" font-size="10.5" fill="var(--muted)">${esc(c)}</text>`; });
+
+  let marks="";
+  if(b.chartType==="line"){
+    vis.forEach(s=>{
+      const pts=s.values.map((v,i)=>[padL+(n===1?pw/2:i*(pw/(n-1))), y(v)]);
+      marks+=`<polyline fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round"
+        points="${pts.map(p=>p.join(",")).join(" ")}"/>`;
+      pts.forEach(p=>marks+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--panel)" stroke="${s.color}" stroke-width="2"/>`);
+    });
+  } else { // bar (grouped)
+    const band=pw/n, bw=Math.min(46, (band*0.7)/Math.max(1,vis.length));
+    b.categories.forEach((c,i)=>{
+      vis.forEach((s,si)=>{
+        const val=s.values[i], h=(val/nice)*ph;
+        const x=padL+i*band+band/2-(vis.length*bw)/2+si*bw;
+        marks+=`<rect x="${x}" y="${padT+ph-h}" width="${bw-3}" height="${h}" rx="3" fill="${s.color}"/>`;
+      });
+    });
+  }
+
+  const legend = b.series.length>1 ? `<div class="legend">${b.series.map(s=>{
+    const off=hidden.has(`${activeId}:${activePage}:${idx}:${s.name}`);
+    return `<span class="chip ${off?'off':'on'}" data-toggle="${activeId}:${activePage}:${idx}:${s.name}">
+      <span class="sw" style="background:${s.color}"></span>${esc(s.name)}</span>`;
+  }).join("")}</div>` : "";
+
+  return `<div class="block card">
+    <div class="chart-title">${b.title?esc(b.title):esc((b.series[0]||{}).name||"Chart")}</div>
+    ${b.desc?`<div class="chart-desc">${esc(b.desc)}</div>`:""}
+    <svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${marks}${xlab}</svg>
+    ${legend}
+  </div>`;
+}
+function niceMax(m){ const p=Math.pow(10,Math.floor(Math.log10(m))); const r=m/p;
+  const s=r<=1?1:r<=2?2:r<=5?5:10; return s*p; }
+
+function renderForm(c){
+  const f=c.form;
+  const fields=f.fields.map(fl=>{
+    let ctrl="";
+    if(fl.type==="secret") ctrl=`<div class="inp-wrap"><input class="inp" type="password" data-field="${fl.name}" placeholder="${fl.placeholder||'••••••••'}"><button type="button" class="eye" data-eye>👁</button></div>`;
+    else if(fl.type==="radio") ctrl=`<div class="radios">${fl.options.map(o=>`<label><input type="radio" name="${fl.name}" value="${o}" ${o===fl.value?'checked':''}> ${o}</label>`).join("")}</div>`;
+    else ctrl=`<input class="inp" type="text" data-field="${fl.name}" placeholder="${fl.placeholder||''}">`;
+    return `<div class="field"><label>${esc(fl.label)} ${fl.required?'<span class="req">*</span>':''}</label>${ctrl}${fl.help?`<div class="help">${esc(fl.help)}</div>`:""}</div>`;
+  }).join("");
+  return `<form id="theForm">
+    <div class="dest">→ writes to <code>${esc(f.destination)}</code> &nbsp;(${f.mode})</div>
+    <div class="secbanner">🔒 <div>These values are saved <b>locally</b> to the file above and are <b>not</b> sent back to the agent or into the chat context.</div></div>
+    ${fields}
+    <div class="form-actions">
+      <button type="button" class="btn ghost" data-cancel>Cancel</button>
+      <button type="submit" class="btn primary">Save credentials →</button>
+    </div>
+  </form>`;
+}
+
+function renderConfirm(c){
+  const cf=c.confirm;
+  return `<div class="confirm ${cf.severity}">
+    <div class="confirm-head">⚠ ${esc(cf.title)}</div>
+    <div class="confirm-body">
+      <p style="margin-top:0;color:var(--muted)">${esc(cf.desc)}</p>
+      ${cf.details.map(d=>`<div class="confirm-detail"><span class="k">${esc(d.k)}</span><span>${esc(d.v)}</span></div>`).join("")}
+    </div>
+    <div class="confirm-actions">
+      <button class="btn ghost" data-confirm="no">${esc(cf.cancelLabel)}</button>
+      <button class="btn primary" style="background:var(--red)" data-confirm="yes">${esc(cf.confirmLabel)}</button>
+    </div>
+  </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ *  CANVAS RENDER                                                      *
+ * ------------------------------------------------------------------ */
+function renderCanvas(){
+  const main=document.getElementById("main");
+  const c=findCanvas(activeId);
+  if(!c){
+    main.innerHTML=`<div class="empty"><div class="big"></div><b>No canvas selected</b>
+      <div>Pick a canvas from the sidebar, or drop a <code>.json</code> file into this folder — it appears automatically.</div>
+      <div style="margin-top:6px">Watching <code>${esc(WS.root)}</code></div></div>`;
+    return;
+  }
+  let inner="";
+  if(c.form) inner=renderForm(c);
+  else if(c.confirm) inner=renderConfirm(c);
+  else if(c.real){ inner=`<div class="placeholder">This is a <b>real file</b> from the folder you opened. Once we agree the canvas schema, InstantCanvas renders its blocks here. Raw contents below:${c._preview!==undefined?`<pre>${esc(c._preview)}</pre>`:" (loading…)"}</div>`; }
+  else {
+    const page=c.pages[activePage]||c.pages[0];
+    inner=page.blocks.map((b,i)=>{
+      if(b.type==="markdown")return renderMarkdown(b);
+      if(b.type==="kpi")return renderKpi(b);
+      if(b.type==="chart")return renderChart(b,i);
+      if(b.type==="table")return renderTable(b);
+      return "";
+    }).join("");
+  }
+  const tabs = (c.pages && c.pages.length>1) ? `<div class="tabs">${c.pages.map((p,i)=>
+    `<button class="tab ${i===activePage?'active':''}" data-page="${i}">${esc(p.name)}</button>`).join("")}</div>` : "";
+
+  main.innerHTML=`<div class="canvas">
+    <div class="canvas-head"><h1>${esc(c.title)}</h1><div class="sub">${esc(c.file)}</div></div>
+    ${tabs}${inner}
+  </div>`;
+}
+
+/* ------------------------------------------------------------------ *
+ *  EVENTS                                                             *
+ * ------------------------------------------------------------------ */
+function selectCanvas(id){ activeId=id; activePage=0; renderTree(); renderCanvas();
+  if(findCanvas(id)?.real) loadRealPreview(id); }
+
+document.getElementById("tree").addEventListener("click",e=>{
+  const g=e.target.closest("[data-group]");
+  if(g){ const name=g.dataset.group; collapsed.has(name)?collapsed.delete(name):collapsed.add(name); renderTree(); return; }
+  const it=e.target.closest("[data-canvas]");
+  if(it){ selectCanvas(it.dataset.canvas); }
+});
+
+document.getElementById("main").addEventListener("click",e=>{
+  const tab=e.target.closest("[data-page]");
+  if(tab){ activePage=+tab.dataset.page; renderCanvas(); return; }
+  const chip=e.target.closest("[data-toggle]");
+  if(chip){ const k=chip.dataset.toggle; hidden.has(k)?hidden.delete(k):hidden.add(k); renderCanvas(); return; }
+  const eye=e.target.closest("[data-eye]");
+  if(eye){ const inp=eye.previousElementSibling; inp.type=inp.type==="password"?"text":"password"; return; }
+  if(e.target.closest("[data-cancel]")){ toast("Cancelled — agent receives { status:\"cancelled\" }"); return; }
+  const cf=e.target.closest("[data-confirm]");
+  if(cf){ const yes=cf.dataset.confirm==="yes";
+    toast(yes?"Confirmed — agent receives { status:\"confirmed\", confirmed:true }":"Cancelled — { confirmed:false }"); return; }
+});
+
+document.getElementById("main").addEventListener("submit",e=>{
+  e.preventDefault();
+  const c=findCanvas(activeId); if(!c.form) return;
+  const names=c.form.fields.map(f=>f.name);
+  showSuccess(c.form.destination, names);
+});
+
+document.getElementById("themeBtn").addEventListener("click",()=>{
+  const cur=document.documentElement.getAttribute("data-theme");
+  const next = cur==="dark"?"light":cur==="light"?"dark":(matchMedia("(prefers-color-scheme:dark)").matches?"light":"dark");
+  document.documentElement.setAttribute("data-theme",next);
+});
+document.getElementById("exportBtn").addEventListener("click",()=>toast("Export → self-contained HTML (stub)"));
+
+/* ---------- success + toast ---------- */
+function showSuccess(dest, fields){
+  const ov=document.createElement("div"); ov.className="overlay";
+  ov.innerHTML=`<div class="modal"><div class="modal-body center">
+    <div class="success-mark">✓</div>
+    <h2 style="margin:0 0 6px">Saved successfully</h2>
+    <div style="color:var(--muted)">${fields.length} values written to <code>${esc(dest)}</code></div>
+    <ul class="fieldlist">${fields.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
+    <div class="agentbox">
+      <div class="cap">the agent receives (redacted)</div>
+      <pre>{ "status":"saved", "destination":"${esc(dest)}",\n  "fields":[${fields.map(f=>`"${esc(f)}"`).join(", ")}] }</pre>
+      <div class="note">↑ field <b>names</b> only — the secret values never leave this browser.</div>
+    </div>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>Done</button></div></div>`;
+  ov.addEventListener("click",ev=>{ if(ev.target===ov||ev.target.closest("[data-close]")) ov.remove(); });
+  document.body.appendChild(ov);
+}
+function toast(msg){
+  const t=document.createElement("div");
+  t.style.cssText="position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:var(--shadow);padding:11px 16px;border-radius:10px;z-index:60;font-size:13px";
+  t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
+}
+
+/* ------------------------------------------------------------------ *
+ *  FOLDER BROWSER  (simulated + real File System Access API)         *
+ * ------------------------------------------------------------------ */
+const FAKE_FS = {
+  "/Users/nic":[
+    {name:"reports", ws:"~/reports"},
+    {name:"clients", ws:"~/clients"},
+    {name:"Documents"},{name:"Downloads"},{name:"projects"},
+  ],
+  "/Users/nic/Documents":[{name:"invoices"},{name:"notes"}],
+  "/Users/nic/projects":[{name:"instant-canvas"},{name:"website"}],
+};
+let fbPath="/Users/nic", fbSel=null;
+
+document.getElementById("openFolder").addEventListener("click",openFolderModal);
+function openFolderModal(){
+  fbPath="/Users/nic"; fbSel=null;
+  const ov=document.createElement("div"); ov.className="overlay"; ov.id="fbOverlay";
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-head">📂 Open workspace folder</div>
+    <div class="modal-body">
+      <button class="btn primary" id="realBtn" style="width:100%">Open a real folder on your computer…</button>
+      <div class="divider">or browse a simulated filesystem</div>
+      <div class="fb-crumb" id="fbCrumb"></div>
+      <div class="fb-list" id="fbList"></div>
+      <div style="color:var(--muted);font-size:12px">Folders that already contain canvases show a ✓ badge.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn primary" id="fbOpen" disabled>Open →</button>
+    </div>
+  </div>`;
+  ov.addEventListener("click",ev=>{ if(ev.target===ov||ev.target.closest("[data-close]")) ov.remove(); });
+  document.body.appendChild(ov);
+  document.getElementById("realBtn").addEventListener("click",openRealFolder);
+  document.getElementById("fbOpen").addEventListener("click",()=>{ if(fbSel){ WS=WORKSPACES[fbSel]; resetView(); ov.remove(); }});
+  drawFB();
+}
+function drawFB(){
+  document.getElementById("fbCrumb").textContent="📁 "+fbPath;
+  const entries=FAKE_FS[fbPath]||[];
+  const up = fbPath!=="/Users/nic" ? `<div class="fb-row" data-up>⬑ ..</div>`:"";
+  document.getElementById("fbList").innerHTML= up + entries.map(en=>`
+    <div class="fb-row ${fbSel&&en.ws===fbSel?'sel':''}" data-name="${esc(en.name)}" data-ws="${en.ws||''}">
+      📁 ${esc(en.name)} ${en.ws?`<span class="fb-badge">✓ workspace (${WORKSPACES[en.ws].groups.reduce((a,g)=>a+g.canvases.length,0)} canvases)</span>`:''}
+    </div>`).join("");
+  document.getElementById("fbList").querySelectorAll(".fb-row").forEach(row=>{
+    row.addEventListener("click",()=>{
+      if(row.dataset.up!==undefined){ fbPath=fbPath.split("/").slice(0,-1).join("/")||"/"; fbSel=null; syncOpen(); drawFB(); return; }
+      const ws=row.dataset.ws, name=row.dataset.name;
+      if(ws){ fbSel=ws; }
+      else { const child=fbPath+"/"+name; if(FAKE_FS[child]){ fbPath=child; fbSel=null; } }
+      syncOpen(); drawFB();
+    });
+  });
+}
+function syncOpen(){ document.getElementById("fbOpen").disabled=!fbSel; }
+
+async function openRealFolder(){
+  if(!window.showDirectoryPicker){ toast("Real folder picker needs Chrome/Edge. Using the simulated one is fine for now."); return; }
+  let dir; try{ dir=await window.showDirectoryPicker(); }catch{ return; }
+  const groups=[]; const rootCanvases=[]; let gi=0;
+  for await (const entry of dir.values()){
+    if(entry.kind==="directory"){
+      const cvs=[];
+      try{ for await (const e2 of entry.values()){
+        if(e2.kind==="file" && e2.name.endsWith(".json"))
+          cvs.push({id:`real${gi++}`, title:e2.name.replace(/\.json$/,""), file:`${entry.name}/${e2.name}`, real:true, handle:e2});
+      }}catch{}
+      if(cvs.length) groups.push({name:entry.name, canvases:cvs});
+    } else if(entry.name.endsWith(".json")){
+      rootCanvases.push({id:`real${gi++}`, title:entry.name.replace(/\.json$/,""), file:entry.name, real:true, handle:entry});
+    }
+  }
+  if(rootCanvases.length) groups.unshift({name:"(root)", canvases:rootCanvases});
+  const key="📂 "+dir.name;
+  WORKSPACES[key]={ root:dir.name+"/", groups: groups.length?groups:[{name:"(root)",canvases:[]}] };
+  WS=WORKSPACES[key];
+  document.getElementById("fbOverlay")?.remove();
+  resetView();
+  toast(groups.length?`Opened “${dir.name}” — ${groups.reduce((a,g)=>a+g.canvases.length,0)} JSON file(s) found`:`Opened “${dir.name}” — no .json files found`);
+}
+async function loadRealPreview(id){
+  const c=findCanvas(id); if(!c||!c.real||c._preview!==undefined) return;
+  try{ const file=await c.handle.getFile(); const txt=await file.text(); c._preview=txt.slice(0,1500)+(txt.length>1500?"\n…":""); }
+  catch{ c._preview="(could not read file)"; }
+  if(activeId===id) renderCanvas();
+}
+
+function resetView(){ activeId=null; activePage=0; renderTree();
+  const first=WS.groups.find(g=>g.canvases.length); if(first) selectCanvas(first.canvases[0].id); else renderCanvas(); }
+
+/* ------------------------------------------------------------------ *
+ *  BOOT                                                               *
+ * ------------------------------------------------------------------ */
+renderTree();
+selectCanvas("cmp");
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+	"name": "init-spec",
+	"version": "0.2.0",
+	"description": "Generate a one-shot-ready SPEC.md from the current session under specs/YYMMDD-NN-slug/, or move an existing spec folder to specs/-DONE or specs/-ARCHIVED.",
+	"keywords": ["spec", "specification", "spec-driven", "one-shot", "session-handoff", "planning", "devops", "implementation-plan"],
+	"type": "skill",
+	"dependencies": {}
+}
