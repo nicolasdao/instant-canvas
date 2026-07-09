@@ -1,0 +1,78 @@
+---
+description: The canvas JSON contract — envelope, six block types, 17 chart kinds, 16 field types, fieldset layout, validation rules, and the progressive-disclosure catalog.
+tags: [schema, validation, catalog, charts, forms]
+source:
+  - .agents/skills/instant-canvas/scripts/lib/schema.js
+  - .agents/skills/instant-canvas/scripts/lib/validate.js
+  - .agents/skills/instant-canvas/scripts/lib/catalog.js
+---
+
+# Canvas Schema, Validator, and Catalog
+
+`lib/schema.js` is the **single source of truth**. It declares the envelope, the six block types, the 17 chart kinds (`CHART_KINDS`), the 16 field types (`FIELD_TYPES`), the reusable shapes (`SHAPES`), and the documented-unsupported chart kinds (`UNSUPPORTED_CHARTS`). `lib/validate.js` *interprets* that registry; `lib/catalog.js` *renders* it. They cannot drift — a test proves that one registry tweak changes both.
+
+## Envelope
+
+```jsonc
+{
+  "instantcanvas": 1,          // required marker; doubles as the workspace-scan discriminator
+  "title": "Q3 Report",        // required
+  "description": "optional",
+  "blocks": [ /* Block[] */ ]   // XOR "pages": [{"name": "Tab", "blocks": [...]}]
+}
+```
+
+A canvas holds **at most one interactive block** (`form` or `confirm`) across all pages (`MULTIPLE_INTERACTIVE_BLOCKS`).
+
+## Blocks
+
+| Type | Kind | Notes |
+|---|---|---|
+| `markdown` | display | Exactly one of inline `text` XOR `src` (workspace-confined path, inlined server-side). Rendered with `html: false`. |
+| `kpi` | display | Cards with `format` (number/currency/percent/none) and `delta` (signed fraction; green iff sign matches `positiveIs`; ~0 renders flat). |
+| `chart` | display | See chart kinds below. |
+| `table` | display | Columns with per-column `format` and `align`; numeric formats right-align with tabular numerals. |
+| `form` | interactive | Fields + destination + optional fieldset layout. See [security.md](security.md) for the write path. |
+| `confirm` | interactive | Severity-styled card (`info`/`warning`/`danger`); resolves `confirmed: true/false`. |
+
+## Chart kinds (17)
+
+`line area bar pie(+donut) scatter heatmap radar funnel gauge candlestick boxplot sankey graph treemap sunburst parallel themeRiver`
+
+Each `CHART_KINDS` entry declares: `summary`, `whenToUse`, `data` (expected row shape), typed `encoding` channels, `aliases` (hint fuel), and a validated `example`. Channel types: `key` (a data-object property name, existence-checked against `data[0]` unless `checkInData: false`), `keys` (one or a list), `number`, `boolean`. Notable shapes:
+
+- **line/area/bar** — wide-format rows; `y` accepts a list (one series per key); `stack: true` stacks.
+- **scatter** — numeric x/y plus optional `size` (bubbles), `series` (color grouping), `label`.
+- **treemap/sunburst** — hierarchical `{name, value, children}` trees; encoding keys default to `name`/`value`/`children`, so `encoding` is optional.
+- **sankey/graph** — rows are *links* (`source`/`target`[/`value`]); nodes are derived.
+- **gauge** — `min`/`max` are numbers in the encoding, not data keys.
+- **themeRiver** — `x` must be a real date string; the stream axis is time-typed.
+
+ECharts kinds requiring external assets or JS functions are **documented as unsupported with reasons** (`map` needs GeoJSON; `custom` needs `renderItem` functions; `effectScatter`/`pictorialBar` route through the `options` escape hatch on their base kind). `options` is a raw ECharts object applied *last* via a second `setOption`, so it refines the generated option with native merge semantics.
+
+## Form fields (16 types)
+
+`text textarea secret email url tel number date datetime select radio checkbox checkboxGroup range hidden readonly`
+
+Common shape: `{name, label, type, required?, placeholder?, help?, default?, options?, validation?, ui?, span?}`.
+
+- `validation`: `{minLength, maxLength, pattern, patternMessage, min, max, step, protocols}`. `pattern` is a whole-value regex; `patternMessage` is returned verbatim when it fails. `protocols` narrows the URL scheme whitelist (default: http, https, ftp, ftps, sftp, ws, wss, file, mailto).
+- `ui` variants (presentation only — serialization unchanged): `"buttons"` renders select/radio as segmented buttons; `"pills"` renders checkboxGroup as a searchable multi-select with removable pills.
+- Layout: items of `fields[]` may be a `{"type": "fieldset", "legend", "description", "columns": 1–3, "fields": [...]}` group; per-field `span` (1–3) widens within the grid. Fieldsets are layout-only — the kernel flattens them (`flattenFields`) before validation and writing. No nesting.
+- Env destinations require field names matching `^[A-Za-z_][A-Za-z0-9_]*$` (`INVALID_ENV_KEY`); duplicate names are rejected across fieldset boundaries.
+
+## Validator behavior
+
+`validate(source, {root})` collects **all** errors in one pass — never fail-fast, never throws for spec problems. Every error carries `code`, `path` (e.g. `pages[1].blocks[0].encoding.y[1]`), `message`, and usually `got`, `expected`, a Levenshtein/alias-driven `hint` ("Did you mean \"range\"?"), and a correct `example`. Unknown properties are **warnings**, not errors. `INVALID_JSON` includes line/column. This is the deterministic half of the agentic loop: the agent writes, the validator names the exact defect and its fix, the agent retries until `{"ok": true}`.
+
+Error codes: `INVALID_JSON, INVALID_SPEC, UNSUPPORTED_VERSION, UNKNOWN_BLOCK_TYPE, UNKNOWN_FIELD_TYPE, UNKNOWN_PROPERTY(warn), MISSING_REQUIRED_PROPERTY, INVALID_PROPERTY_TYPE, INVALID_ENUM_VALUE, DUPLICATE_FIELD_NAME, MULTIPLE_INTERACTIVE_BLOCKS, ENCODING_KEY_NOT_IN_DATA, INVALID_ENV_KEY, PATH_OUTSIDE_WORKSPACE` — plus runtime codes surfaced by the CLI/kernel: `SECRET_RETURN_BLOCKED, WRITE_FAILED, SESSION_TIMEOUT, KERNEL_UNREACHABLE, BROWSER_OPEN_FAILED(warn), INTERNAL_ERROR`.
+
+## Catalog: progressive disclosure
+
+The catalog is designed so an agent pulls **only the information it needs, when it needs it**:
+
+1. `catalog` (bare) — a **~4 KB lean index**: one-liners for every block, every chart kind (with when-to-use), every field type, plus layout/validation pointers. No schemas — a test asserts no `"properties"` key appears and caps the payload size.
+2. `catalog <name>` — ONE full contract: a block, a chart kind, a field type, `fieldset`, or `envelope`. Chart kinds return summary, when-to-use, data shape, typed encoding, and a working example.
+3. `catalog --full` — the everything dump, for the rare case it is genuinely needed.
+
+Unknown names fail helpfully: `catalog custom` explains *why* it is unsupported; misspellings get the closest valid entry.

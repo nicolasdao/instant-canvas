@@ -1,0 +1,471 @@
+{
+  "diagnostics": {
+    "gotchas": {
+      "dead_hub_links": [],
+      "format": "hub+domain",
+      "orphaned_domain_files": [],
+      "oversized_domain_files": []
+    }
+  },
+  "generated_from": "README.md + docs/**/*.md (excl docs/manual/)",
+  "nodes": [
+    {
+      "dangling": false,
+      "description": null,
+      "has_frontmatter": false,
+      "headings": [
+        "InstantCanvas",
+        "Table of Contents",
+        "Overview",
+        "Getting Started",
+        "Project Structure",
+        "Documentation"
+      ],
+      "line_count": 87,
+      "links_to": [
+        "docs/architecture.md",
+        "docs/canvas-schema.md",
+        "docs/cli.md",
+        "docs/frontend.md",
+        "docs/gotchas.md",
+        "docs/mission.md",
+        "docs/security.md",
+        "docs/testing.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "README.md",
+      "source": [],
+      "source_unresolved": [],
+      "tags": [],
+      "toc": {
+        "linked": true,
+        "present": true,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "How the CLI, per-workspace kernel, and browser fit together — process model, registry, sessions, hot reload, and the security perimeter.",
+      "has_frontmatter": true,
+      "headings": [
+        "Architecture",
+        "Kernel-per-workspace model",
+        "Registry: state, never code",
+        "Request perimeter",
+        "Routes",
+        "Workspace scan",
+        "Sessions",
+        "Hot reload",
+        "Version handshake"
+      ],
+      "line_count": 90,
+      "links_to": [
+        "docs/gotchas/frontend.md",
+        "docs/gotchas/runtime.md",
+        "docs/security.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/architecture.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/kernel.js",
+        ".agents/skills/instant-canvas/scripts/lib/paths.js",
+        ".agents/skills/instant-canvas/scripts/lib/registry.js",
+        ".agents/skills/instant-canvas/scripts/lib/session.js",
+        ".agents/skills/instant-canvas/scripts/lib/scan.js",
+        ".agents/skills/instant-canvas/scripts/lib/fsatomic.js",
+        ".agents/skills/instant-canvas/scripts/lib/browser.js"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "architecture",
+        "kernel",
+        "sessions",
+        "websocket",
+        "security"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The canvas JSON contract — envelope, six block types, 17 chart kinds, 16 field types, fieldset layout, validation rules, and the progressive-disclosure catalog.",
+      "has_frontmatter": true,
+      "headings": [
+        "Canvas Schema, Validator, and Catalog",
+        "Envelope",
+        "Blocks",
+        "Chart kinds (17)",
+        "Form fields (16 types)",
+        "Validator behavior",
+        "Catalog: progressive disclosure"
+      ],
+      "line_count": 78,
+      "links_to": [
+        "docs/security.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/canvas-schema.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/lib/schema.js",
+        ".agents/skills/instant-canvas/scripts/lib/validate.js",
+        ".agents/skills/instant-canvas/scripts/lib/catalog.js"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "schema",
+        "validation",
+        "catalog",
+        "charts",
+        "forms"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The instantcanvas CLI — commands, flags, exit codes, stdout discipline, the result contract, and the agent workflow it enables.",
+      "has_frontmatter": true,
+      "headings": [
+        "CLI",
+        "Output discipline",
+        "Commands",
+        "open",
+        "validate / catalog / status / stop",
+        "Result contract (stdout of `open`)",
+        "The agent workflow"
+      ],
+      "line_count": 63,
+      "links_to": [
+        "docs/canvas-schema.md",
+        "docs/security.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/cli.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/instantcanvas.js"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "cli",
+        "commands",
+        "agent-workflow"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The browser app — shell, block renderers, bespoke form widgets, chart mapping, theming, icons, and the CSP constraints that shape the code.",
+      "has_frontmatter": true,
+      "headings": [
+        "Frontend",
+        "Shell",
+        "Display renderers",
+        "Bespoke form widgets",
+        "Layout",
+        "Theming",
+        "Icons and vendored assets"
+      ],
+      "line_count": 51,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/frontend.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/web/index.html",
+        ".agents/skills/instant-canvas/scripts/web/app.js",
+        ".agents/skills/instant-canvas/scripts/web/styles.css",
+        ".agents/skills/instant-canvas/scripts/web/vendor/VENDORED.md"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "frontend",
+        "ui",
+        "echarts",
+        "widgets",
+        "theming"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": null,
+      "has_frontmatter": false,
+      "headings": [
+        "Gotchas"
+      ],
+      "line_count": 8,
+      "links_to": [
+        "docs/gotchas/frontend.md",
+        "docs/gotchas/packaging.md",
+        "docs/gotchas/runtime.md",
+        "docs/gotchas/testing.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/gotchas.md",
+      "source": [],
+      "source_unresolved": [],
+      "tags": [],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Browser-side gotchas — CSP surprises, ECharts constraints, and popover event traps discovered while building the UI.",
+      "has_frontmatter": true,
+      "headings": [
+        "Gotchas — Frontend",
+        "CSP silently drops `style=\"\"` attributes",
+        "ECharts cannot read CSS variables",
+        "The `options` escape hatch must merge via a second `setOption`",
+        "Re-rendering a popover detaches the clicked element",
+        "`echarts.simple.min.js` is not a drop-in slimming",
+        "Native widget chrome ignores your dark theme",
+        "themeRiver needs real dates",
+        "Constraint API quirks around custom widgets"
+      ],
+      "line_count": 42,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/gotchas/frontend.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/web/app.js",
+        ".agents/skills/instant-canvas/scripts/web/styles.css",
+        ".agents/skills/instant-canvas/scripts/web/index.html"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "gotchas",
+        "frontend",
+        "csp",
+        "echarts"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "HappySkills packaging constraints — bundle caps, description validators, and scaffolding rules that shaped the skill's metadata.",
+      "has_frontmatter": true,
+      "headings": [
+        "Gotchas — Skill Packaging (HappySkills)",
+        "The 1 MB bundle cap vs vendored ECharts",
+        "Description validators are strict and double-layered",
+        "Never scaffold a skill by hand",
+        "The skill loads from a mirror path"
+      ],
+      "line_count": 25,
+      "links_to": [
+        "docs/gotchas/frontend.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/gotchas/packaging.md",
+      "source": [
+        ".agents/skills/instant-canvas/skill.json",
+        ".agents/skills/instant-canvas/SKILL.md"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "gotchas",
+        "happyskills",
+        "packaging"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Kernel and CLI gotchas — process lifecycle, sockets, stdout, and state-dir traps learned while building the runtime.",
+      "has_frontmatter": true,
+      "headings": [
+        "Gotchas — Runtime (kernel & CLI)",
+        "`process.exit` truncates large stdout",
+        "A single failed session poll is not a dead kernel",
+        "Same-version code changes do not restart a running kernel",
+        "Liveness must be health-ping, never PID",
+        "macOS `/tmp` is a symlink",
+        "Background `open` outliving its shell",
+        "Deleting collections is not `rm -rf`"
+      ],
+      "line_count": 38,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/gotchas/runtime.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/kernel.js",
+        ".agents/skills/instant-canvas/scripts/instantcanvas.js",
+        ".agents/skills/instant-canvas/scripts/lib/registry.js"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "gotchas",
+        "kernel",
+        "cli"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "node:test runner traps on Node 24 — subtest socket isolation, directory entries, and shared-state-dir coordination.",
+      "has_frontmatter": true,
+      "headings": [
+        "Gotchas — Testing",
+        "Subtests cannot reach parent-context servers (Node 24.0.x)",
+        "`node --test <dir>` does not expand the directory",
+        "Set the state dir with `||=`, before requiring the registry",
+        "A security scan can trip over its own test file",
+        "Fake registry entries in shared state dirs look like leaks"
+      ],
+      "line_count": 28,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/gotchas/testing.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/test/**"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "gotchas",
+        "testing",
+        "node24"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": null,
+      "has_frontmatter": false,
+      "headings": [
+        "InstantCanvas — Mission",
+        "Vision",
+        "Values",
+        "Non-goals",
+        "Users",
+        "User Experience Compass",
+        "Decision-Making Compass"
+      ],
+      "line_count": 50,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/mission.md",
+      "source": [],
+      "source_unresolved": [],
+      "tags": [],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The secret-handling model — what InstantCanvas guarantees, how redaction and workspace confinement work, and what it deliberately does not protect against.",
+      "has_frontmatter": true,
+      "headings": [
+        "Security Model",
+        "The honest claim",
+        "Secret hygiene pipeline",
+        "Write path",
+        "Network perimeter",
+        "What this does NOT protect against"
+      ],
+      "line_count": 43,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/security.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/lib/redact.js",
+        ".agents/skills/instant-canvas/scripts/lib/envfile.js",
+        ".agents/skills/instant-canvas/scripts/lib/jsonfile.js",
+        ".agents/skills/instant-canvas/scripts/kernel.js"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "security",
+        "secrets",
+        "redaction",
+        "csp"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven browser verification used during development.",
+      "has_frontmatter": true,
+      "headings": [
+        "Testing",
+        "Suite layout",
+        "Isolation patterns",
+        "Security regressions",
+        "Browser verification (development practice, not in the suite)"
+      ],
+      "line_count": 46,
+      "links_to": [
+        "docs/gotchas/testing.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/testing.md",
+      "source": [
+        ".agents/skills/instant-canvas/scripts/test/**"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "testing",
+        "node-test",
+        "cdp",
+        "verification"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    }
+  ]
+}
