@@ -453,6 +453,34 @@ async function route(req, res, url) {
 		}
 	}
 
+	// Delete a sidebar collection: removes only CANVAS files (marker-checked)
+	// directly inside the depth-1 subfolder, then the folder itself if empty.
+	// Non-canvas content is never touched; "(root)" (the workspace) is refused.
+	if (method === 'POST' && p === '/api/collection/delete') {
+		const body = await readBody(req)
+		const name = String(body.name || '')
+		if (!name || name === '(root)' || name.includes('/') || name.includes('\\') || name.startsWith('.'))
+			return sendJson(res, 400, { ok: false, message: 'Only first-level collection folders can be deleted.' })
+		const dir = path.join(ROOT, name)
+		if (!insideRoot(ROOT, dir) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory())
+			return sendJson(res, 404, { ok: false, message: 'No such collection folder.' })
+		let removedCanvases = 0
+		for (const entry of fs.readdirSync(dir)) {
+			const abs = path.join(dir, entry)
+			if (entry.endsWith('.json') && readCanvasFile(abs)) {
+				fs.unlinkSync(abs)
+				removedCanvases++
+			}
+		}
+		let removedFolder = false
+		if (fs.readdirSync(dir).length === 0) {
+			fs.rmdirSync(dir)
+			removedFolder = true
+		}
+		klog('collection deleted:', name, `(${removedCanvases} canvases, folder removed: ${removedFolder})`)
+		return sendJson(res, 200, { ok: true, removedCanvases, removedFolder })
+	}
+
 	if (method === 'POST' && p === '/api/browse') {
 		const body = await readBody(req)
 		const dir = path.resolve(String(body.dir || os.homedir()))

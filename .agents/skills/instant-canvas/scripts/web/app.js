@@ -51,7 +51,10 @@ const LUCIDE = {
 	'eye-off': '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
 	'folder': '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
 	'folder-open': '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+	'house': '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
 	'info': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+	'plus': '<path d="M5 12h14"/><path d="M12 5v14"/>',
+	'trash-2': '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
 	'lock': '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
 	'octagon-alert': '<path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z"/>',
 	'triangle-alert': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
@@ -77,14 +80,6 @@ function flattenFields(items) {
 }
 
 const normOptions = (options = []) => options.map((o) => (typeof o === 'string' ? { label: o, value: o } : o))
-
-/** "…/parent/base" for long absolute paths; full path belongs in a title tooltip. */
-function shortenPath(p) {
-	const parts = String(p).split('/').filter(Boolean)
-	if (parts.length <= 3)
-		return p
-	return '…/' + parts.slice(-2).join('/')
-}
 
 function fmtValue(v, format, currency) {
 	if (v === null || v === undefined || v === '') return ''
@@ -175,15 +170,19 @@ function findCanvas(id) {
 function renderTree() {
 	const tree = $('tree')
 	if (!state.tree) { tree.innerHTML = '' ; return }
+	const rootBase = state.tree.root.split('/').filter(Boolean).pop() || state.tree.root
 	tree.innerHTML = state.tree.collections.map((g) => {
 		const isC = state.collapsed.has(g.name)
+		const isRoot = g.name === '(root)' // canvases living directly in the workspace folder
 		const items = g.canvases.map((c) => `
 			<div class="item ${c.id === state.activeId ? 'active' : ''}" data-canvas="${esc(c.id)}">
 				<span class="dot"></span>${esc(c.title)}
 			</div>`).join('')
 		return `<div class="group ${isC ? 'collapsed' : ''}">
-			<div class="group-row" data-group="${esc(g.name)}">
-				<span class="caret">${icon('chevron-down')}</span>${icon('folder')} ${esc(g.name)}
+			<div class="group-row" data-group="${esc(g.name)}" ${isRoot ? `title="Canvases directly inside the workspace folder (${esc(state.tree.root)})"` : ''}>
+				<span class="caret">${icon('chevron-down')}</span>${icon(isRoot ? 'house' : 'folder')}
+				<span class="gname">${esc(isRoot ? rootBase : g.name)}</span>
+				${isRoot ? '' : `<button class="grp-del" data-del-group="${esc(g.name)}" title="Delete this folder's canvases from disk">${icon('trash-2')}</button>`}
 			</div>
 			<div class="items">${items}</div>
 		</div>`
@@ -191,15 +190,70 @@ function renderTree() {
 
 	const n = state.tree.count, ng = state.tree.collections.length
 	$('wsStats').textContent = `${n} canvas${n === 1 ? '' : 'es'} · ${ng} group${ng === 1 ? '' : 's'}`
-	const rootEl = $('rootpath')
-	rootEl.textContent = shortenPath(state.tree.root)
-	rootEl.title = state.tree.root
+	fullRootPath = state.tree.root
+	$('rootpath').title = state.tree.root
+	fitRootPath()
 	const watchEl = $('watchPath')
-	watchEl.textContent = state.tree.root.split('/').filter(Boolean).pop() || state.tree.root
+	watchEl.textContent = rootBase
 	watchEl.title = state.tree.root
 }
 
+// The header path fills whatever space is available; when it can't, it is
+// trimmed from the START (the tail of a path is the informative part).
+let fullRootPath = ''
+function fitRootPath() {
+	const el = $('rootpath')
+	if (!fullRootPath)
+		return
+	el.textContent = fullRootPath
+	if (el.scrollWidth <= el.clientWidth)
+		return
+	let lo = 1, hi = fullRootPath.length
+	while (lo < hi) { // smallest number of leading chars to drop
+		const mid = Math.floor((lo + hi) / 2)
+		el.textContent = '…' + fullRootPath.slice(mid)
+		if (el.scrollWidth <= el.clientWidth)
+			hi = mid
+		else
+			lo = mid + 1
+	}
+	el.textContent = '…' + fullRootPath.slice(lo)
+}
+new ResizeObserver(fitRootPath).observe($('rootpath'))
+
+async function deleteCollection(name) {
+	const group = state.tree && state.tree.collections.find((c) => c.name === name)
+	const count = group ? group.canvases.length : 0
+	const yes = await askConfirmation({
+		title: `Delete folder "${name}"?`,
+		bodyHtml: `<p>This deletes the <b>${count}</b> canvas file${count === 1 ? '' : 's'} inside <code>${esc(name)}/</code> from disk.
+			Non-canvas files are left alone; the folder itself is removed only if it ends up empty.</p>`,
+		confirmLabel: 'Delete',
+	})
+	if (!yes)
+		return
+	const { status, json } = await api('/api/collection/delete', { method: 'POST', body: JSON.stringify({ name }) })
+	if (status === 200 && json && json.ok) {
+		toast(`Deleted ${json.removedCanvases} canvas${json.removedCanvases === 1 ? '' : 'es'}${json.removedFolder ? ' and removed the folder' : ''}.`)
+		if (state.activeId && state.activeId.startsWith(name + '/'))
+			location.hash = ''
+		const ws = await api('/api/workspace')
+		if (ws.json && ws.json.ok) {
+			state.tree = ws.json
+			renderTree()
+			renderCanvas()
+		}
+	} else {
+		toast('Could not delete: ' + ((json && json.message) || `HTTP ${status}`))
+	}
+}
+
 $('tree').addEventListener('click', (e) => {
+	const del = e.target.closest('[data-del-group]')
+	if (del) {
+		deleteCollection(del.dataset.delGroup)
+		return
+	}
 	const g = e.target.closest('[data-group]')
 	if (g) {
 		const name = g.dataset.group

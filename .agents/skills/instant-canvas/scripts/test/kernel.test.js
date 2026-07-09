@@ -255,6 +255,31 @@ test('kernel: browse lists directories with canvas counts', async () => {
 	assert.equal(typeof r.json.parent, 'string')
 })
 
+test('kernel: collection delete removes canvas files only, refuses root and traversal', async () => {
+	const dir = path.join(K.root, 'todelete')
+	fs.mkdirSync(dir)
+	fs.copyFileSync(path.join(FIXTURES, 'valid-display.canvas.json'), path.join(dir, 'a.canvas.json'))
+	fs.copyFileSync(path.join(FIXTURES, 'valid-display.canvas.json'), path.join(dir, 'b.canvas.json'))
+	fs.writeFileSync(path.join(dir, 'keep.txt'), 'not a canvas')
+
+	const r = await httpReq({ port: K.port, method: 'POST', path: '/api/collection/delete', headers: K.auth, body: { name: 'todelete' } })
+	assert.equal(r.status, 200)
+	assert.equal(r.json.removedCanvases, 2)
+	assert.equal(r.json.removedFolder, false, 'folder kept — it still holds a non-canvas file')
+	assert.ok(fs.existsSync(path.join(dir, 'keep.txt')), 'non-canvas file untouched')
+	assert.ok(!fs.existsSync(path.join(dir, 'a.canvas.json')))
+
+	fs.unlinkSync(path.join(dir, 'keep.txt'))
+	const again = await httpReq({ port: K.port, method: 'POST', path: '/api/collection/delete', headers: K.auth, body: { name: 'todelete' } })
+	assert.equal(again.json.removedFolder, true, 'now-empty folder removed')
+	assert.ok(!fs.existsSync(dir))
+
+	assert.equal((await httpReq({ port: K.port, method: 'POST', path: '/api/collection/delete', headers: K.auth, body: { name: '(root)' } })).status, 400)
+	assert.equal((await httpReq({ port: K.port, method: 'POST', path: '/api/collection/delete', headers: K.auth, body: { name: '../evil' } })).status, 400)
+	assert.equal((await httpReq({ port: K.port, method: 'POST', path: '/api/collection/delete', headers: K.auth, body: { name: '.hidden' } })).status, 400)
+	assert.equal((await httpReq({ port: K.port, method: 'POST', path: '/api/collection/delete', headers: K.auth, body: { name: 'nope' } })).status, 404)
+})
+
 test('kernel: shutdown removes the registry entry and exits 0', async () => {
 	const exited = new Promise((resolve) => K.child.on('exit', resolve))
 	const r = await httpReq({ port: K.port, method: 'POST', path: '/api/shutdown', headers: K.auth, body: {} })
