@@ -16,12 +16,13 @@
       "headings": [
         "InstantCanvas",
         "Table of Contents",
+        "What this repository is (and is not)",
         "Overview",
         "Getting Started",
         "Project Structure",
         "Documentation"
       ],
-      "line_count": 87,
+      "line_count": 94,
       "links_to": [
         "docs/architecture.md",
         "docs/canvas-schema.md",
@@ -274,12 +275,13 @@
       "has_frontmatter": true,
       "headings": [
         "Gotchas — Skill Packaging (HappySkills)",
+        "Everything inside the skill folder ships — keep maintainer material out",
         "The 1 MB bundle cap vs vendored ECharts",
         "Description validators are strict and double-layered",
         "Never scaffold a skill by hand",
         "The skill loads from a mirror path"
       ],
-      "line_count": 25,
+      "line_count": 29,
       "links_to": [
         "docs/gotchas/frontend.md"
       ],

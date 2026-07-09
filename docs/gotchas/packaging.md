@@ -8,6 +8,10 @@ source:
 
 # Gotchas — Skill Packaging (HappySkills)
 
+## Everything inside the skill folder ships — keep maintainer material out
+
+`release`/`publish` bundles the **entire** `.agents/skills/instant-canvas/` folder; whatever you drop in there reaches every consumer and competes for their agents' context. That is why this repo splits **product** (the skill folder: SKILL.md, scripts, examples, vendored assets) from **workbench** (repo-level `docs/`, `specs/`, `prototype/`, `demos/`, tooling). Never add design notes, specs, test tooling, or dev docs inside the skill folder — put them at the repo level. The inverse also holds: anything a consumer needs must live *inside* the skill folder, because the published bundle is all they get.
+
 ## The 1 MB bundle cap vs vendored ECharts
 
 `npx happyskills validate` enforces a 1 MB total bundle size; the full `echarts.min.js` alone is 1.03 MB, so the bundle check fails (~1.3 MB total) while every other check passes. This is accepted: the full build is required (the simple build lacks legend/tooltip — see [frontend.md](frontend.md)), and the cap only matters if the skill is ever **published**. Revisit with a custom ECharts build before publishing; do not "fix" it by swapping builds.

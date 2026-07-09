@@ -5,11 +5,18 @@ Death to the admin panel: a local, schema-driven canvas runtime that lets coding
 ## Table of Contents
 
 <!-- BEGIN toc -->
+- [What this repository is (and is not)](#what-this-repository-is-and-is-not)
 - [Overview](#overview)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [Documentation](#documentation)
 <!-- END toc -->
+
+## What this repository is (and is not)
+
+**This repository is not the skill — it is the workbench that maintains it.** The skill itself is the self-contained package at `.agents/skills/instant-canvas/` (published to the HappySkills registry as `nicolasdao/instant-canvas`): its SKILL.md, runtime scripts, examples, and vendored assets. Everything inside that folder ships in the published bundle and is exposed to the skill's consumers and their agents' context windows.
+
+Everything *outside* it exists to develop and maintain the skill: this documentation (`docs/`), the specifications (`specs/`), the UI prototype (`prototype/`), showcase canvases (`demos/`), and any end-to-end tooling. It lives out here **deliberately** — a skill this large needs real maintainer documentation, but maintainer material inside the skill folder would bloat the published bundle and pollute what the world (and every consuming agent) receives. Keep the boundary strict: consumer-facing content goes in the skill folder, maintainer-facing content goes in the repo.
 
 ## Overview
 
@@ -53,7 +60,7 @@ node --test scripts/test/
 ## Project Structure
 
 ```
-.agents/skills/instant-canvas/   The skill itself
+.agents/skills/instant-canvas/   THE PRODUCT — the published skill (ships in full to the registry)
   SKILL.md                       Agent-facing contract (progressive-disclosure entry point)
   skill.json                     HappySkills metadata
   examples/                      Four validated example canvases
@@ -63,10 +70,10 @@ node --test scripts/test/
     lib/                         schema/validate/catalog, registry, redact, envfile, …
     web/                         Browser app (no framework) + vendored ECharts/markdown-it
     test/                        node:test suite + fixtures
-demos/                           Showcase canvases (chart gallery, form kitchen sink, …)
-prototype/index.html             Original user-approved UI reference (read-only)
-specs/                           The implementation spec that built the MVP (user-owned)
-docs/                            This documentation
+demos/                           WORKBENCH — showcase canvases (chart gallery, form kitchen sink, …)
+prototype/index.html             WORKBENCH — original user-approved UI reference (read-only)
+specs/                           WORKBENCH — implementation specs (user-owned)
+docs/                            WORKBENCH — maintainer documentation (never shipped with the skill)
 ```
 
 ## Documentation
