@@ -455,7 +455,7 @@ function controlHtml(field) {
 
 // ---------------------------------------------------------------- date picker
 
-const DP = { el: null, input: null, view: null } // one popover at a time
+const DP = { el: null, input: null, view: null, mode: 'days' } // one popover at a time
 
 const isoOf = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -469,33 +469,66 @@ function closeDatePicker() {
 	}
 }
 
+const dpYearPage = (y) => y - ((y % 12) + 12) % 12 // first year of the 12-year page
+
 function renderDatePicker() {
 	const now = new Date()
 	const { y, m } = DP.view
 	const selected = /^\d{4}-\d{2}-\d{2}$/.test(DP.input.value) ? DP.input.value : null
-	const first = new Date(y, m, 1)
-	const startOffset = (first.getDay() + 6) % 7 // Monday-first
-	const start = new Date(y, m, 1 - startOffset)
-	let cells = ''
-	for (let i = 0; i < 42; i++) {
-		const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
-		const iso = isoOf(d.getFullYear(), d.getMonth(), d.getDate())
-		const cls = [
-			'dp-day',
-			d.getMonth() !== m ? 'dp-out' : '',
-			iso === isoOf(now.getFullYear(), now.getMonth(), now.getDate()) ? 'dp-today' : '',
-			iso === selected ? 'dp-sel' : '',
-		].filter(Boolean).join(' ')
-		cells += `<button type="button" class="${cls}" data-dp-day="${iso}">${d.getDate()}</button>`
+	const selDate = selected ? new Date(selected + 'T00:00:00') : null
+
+	let title = ''
+	let body = ''
+	if (DP.mode === 'days') {
+		title = `<button type="button" data-dp-show="months">${MONTHS[m]}</button>
+			<button type="button" data-dp-show="years">${y}</button>`
+		const startOffset = (new Date(y, m, 1).getDay() + 6) % 7 // Monday-first
+		const start = new Date(y, m, 1 - startOffset)
+		let cells = ''
+		for (let i = 0; i < 42; i++) {
+			const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+			const iso = isoOf(d.getFullYear(), d.getMonth(), d.getDate())
+			const cls = [
+				'dp-day',
+				d.getMonth() !== m ? 'dp-out' : '',
+				iso === isoOf(now.getFullYear(), now.getMonth(), now.getDate()) ? 'dp-today' : '',
+				iso === selected ? 'dp-sel' : '',
+			].filter(Boolean).join(' ')
+			cells += `<button type="button" class="${cls}" data-dp-day="${iso}">${d.getDate()}</button>`
+		}
+		body = `<div class="dp-week">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
+			<div class="dp-grid">${cells}</div>`
+	} else if (DP.mode === 'months') {
+		title = `<button type="button" data-dp-show="years">${y}</button>`
+		body = `<div class="dp-mgrid">${MONTHS.map((name, i) => {
+			const cls = [
+				'dp-day dp-cell',
+				now.getFullYear() === y && now.getMonth() === i ? 'dp-today' : '',
+				selDate && selDate.getFullYear() === y && selDate.getMonth() === i ? 'dp-sel' : '',
+			].filter(Boolean).join(' ')
+			return `<button type="button" class="${cls}" data-dp-month="${i}">${name.slice(0, 3)}</button>`
+		}).join('')}</div>`
+	} else { // years
+		const startY = dpYearPage(y)
+		title = `<span class="dp-range">${startY} – ${startY + 11}</span>`
+		body = `<div class="dp-mgrid">${Array.from({ length: 12 }, (_, i) => {
+			const year = startY + i
+			const cls = [
+				'dp-day dp-cell',
+				now.getFullYear() === year ? 'dp-today' : '',
+				selDate && selDate.getFullYear() === year ? 'dp-sel' : '',
+			].filter(Boolean).join(' ')
+			return `<button type="button" class="${cls}" data-dp-year="${year}">${year}</button>`
+		}).join('')}</div>`
 	}
+
 	DP.el.innerHTML = `
 		<div class="dp-head">
 			<button type="button" class="dp-nav" data-dp-nav="-1">${icon('chevron-left')}</button>
-			<div class="dp-title">${MONTHS[m]} <span>${y}</span></div>
+			<div class="dp-title">${title}</div>
 			<button type="button" class="dp-nav" data-dp-nav="1">${icon('chevron-right')}</button>
 		</div>
-		<div class="dp-week">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
-		<div class="dp-grid">${cells}</div>
+		${body}
 		<div class="dp-foot">
 			<button type="button" class="dp-link" data-dp-clear>Clear</button>
 			<button type="button" class="dp-link" data-dp-today>Today</button>
@@ -508,6 +541,7 @@ function openDatePicker(input) {
 	const base = /^\d{4}-\d{2}-\d{2}$/.test(input.value) ? new Date(input.value + 'T00:00:00') : new Date()
 	DP.input = input
 	DP.view = { y: base.getFullYear(), m: base.getMonth() }
+	DP.mode = 'days'
 	DP.el = document.createElement('div')
 	DP.el.className = 'dp'
 	renderDatePicker()
@@ -516,11 +550,41 @@ function openDatePicker(input) {
 
 	DP.el.addEventListener('mousedown', (e) => e.preventDefault()) // keep input focus
 	DP.el.addEventListener('click', (e) => {
+		// Re-renders detach the clicked node, so the document-level closer would
+		// see it as "outside" — never let picker clicks bubble that far.
+		e.stopPropagation()
 		const nav = e.target.closest('[data-dp-nav]')
 		if (nav) {
-			DP.view.m += Number(nav.dataset.dpNav)
-			if (DP.view.m < 0) { DP.view.m = 11; DP.view.y-- }
-			if (DP.view.m > 11) { DP.view.m = 0; DP.view.y++ }
+			const dir = Number(nav.dataset.dpNav)
+			if (DP.mode === 'days') {
+				DP.view.m += dir
+				if (DP.view.m < 0) { DP.view.m = 11; DP.view.y-- }
+				if (DP.view.m > 11) { DP.view.m = 0; DP.view.y++ }
+			} else if (DP.mode === 'months') {
+				DP.view.y += dir
+			} else {
+				DP.view.y += dir * 12
+			}
+			renderDatePicker()
+			return
+		}
+		const show = e.target.closest('[data-dp-show]')
+		if (show) {
+			DP.mode = show.dataset.dpShow
+			renderDatePicker()
+			return
+		}
+		const month = e.target.closest('[data-dp-month]')
+		if (month) {
+			DP.view.m = Number(month.dataset.dpMonth)
+			DP.mode = 'days'
+			renderDatePicker()
+			return
+		}
+		const year = e.target.closest('[data-dp-year]')
+		if (year) {
+			DP.view.y = Number(year.dataset.dpYear)
+			DP.mode = 'months'
 			renderDatePicker()
 			return
 		}
@@ -530,7 +594,7 @@ function openDatePicker(input) {
 			DP.input.dispatchEvent(new Event('input', { bubbles: true }))
 			closeDatePicker()
 		}
-		if (day) return pick(day.dataset.dpDay)
+		if (day && day.dataset.dpDay) return pick(day.dataset.dpDay)
 		if (e.target.closest('[data-dp-today]')) {
 			const t = new Date()
 			return pick(isoOf(t.getFullYear(), t.getMonth(), t.getDate()))
