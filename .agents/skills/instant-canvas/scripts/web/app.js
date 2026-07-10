@@ -2024,8 +2024,12 @@ function buildBackCover(geo, back) {
 }
 
 /** TOC rows as fragments (packed like everything else — a long report's TOC
- *  may span sheets). Entries only, dotted leaders, NO page numbers: the human
- *  print dialog can change paper or scale, and printed numbers must not lie. */
+ *  may span sheets). Each row carries an empty .toc-num span; the numbers are
+ *  filled in AFTER the body and the TOC itself are packed (only then are the
+ *  absolute page numbers known — digit text does not change row height, so no
+ *  repack is needed). The numbers reflect the deck's own pagination: exact on
+ *  screen, for the print command, and for Cmd+P at default settings; a manual
+ *  paper/scale override in the print dialog can still repaginate. */
 function tocFragments(doc, entries) {
 	const frags = []
 	const head = document.createElement('div')
@@ -2047,8 +2051,11 @@ function tocFragments(doc, entries) {
 		label.textContent = e.text
 		const dots = document.createElement('span')
 		dots.className = 'dots'
+		const num = document.createElement('span')
+		num.className = 'toc-num'
 		row.appendChild(label)
 		row.appendChild(dots)
+		row.appendChild(num)
 		frags.push({ el: row, kind: null })
 	}
 	return frags
@@ -2146,12 +2153,35 @@ async function renderDocumentView(main, canvas) {
 		.flatMap((f) => [...f.el.querySelectorAll('img')])
 		.map((img) => img.decode().catch(() => {})))
 
+	// The body packs FIRST: TOC page numbers need to know which sheet every
+	// anchored heading and block title landed on. The TOC packs second (its
+	// own sheet count shifts the absolute numbers), and only then are the
+	// numbers written into the already-placed rows — digits don't change a
+	// row's height, so nothing needs repacking.
+	const bodySheets = packFragments(fragments, geo, doc, rootEl)
+	const anchorSheet = new Map()
+	bodySheets.forEach((sheet, i) => {
+		for (const el of sheet.querySelectorAll('[data-doc-anchor]'))
+			anchorSheet.set(el.dataset.docAnchor, i)
+	})
+	const hasCover = doc.cover && typeof doc.cover === 'object'
+	let tocSheets = []
+	if (doc.toc && typeof doc.toc === 'object') {
+		tocSheets = packFragments(tocFragments(doc, entries), geo, doc, rootEl)
+		const offset = (hasCover ? 1 : 0) + tocSheets.length
+		for (const ts of tocSheets) {
+			for (const row of ts.querySelectorAll('.toc-entry')) {
+				const bodyIdx = anchorSheet.get(row.dataset.target)
+				if (bodyIdx !== undefined)
+					row.querySelector('.toc-num').textContent = String(offset + bodyIdx + 1)
+			}
+		}
+	}
 	const sheets = []
-	if (doc.cover && typeof doc.cover === 'object')
+	if (hasCover)
 		sheets.push(buildCover(geo, doc.cover))
-	if (doc.toc && typeof doc.toc === 'object')
-		sheets.push(...packFragments(tocFragments(doc, entries), geo, doc, rootEl))
-	sheets.push(...packFragments(fragments, geo, doc, rootEl))
+	sheets.push(...tocSheets)
+	sheets.push(...bodySheets)
 	if (doc.backCover && typeof doc.backCover === 'object')
 		sheets.push(buildBackCover(geo, doc.backCover))
 	if (!sheets.length)

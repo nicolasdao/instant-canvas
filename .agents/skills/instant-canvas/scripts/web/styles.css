@@ -574,6 +574,18 @@ body.modal-open .main{overflow:hidden}
 .vt-btn.active{background:var(--accent-soft);color:var(--accent)}
 .vt-btn .lucide{width:15px;height:15px}
 
+/* floating print action — the document's main deliverable is the PDF, so its
+   trigger floats bottom-right, only while a document canvas is open. App
+   chrome, not paper: it follows the app theme and never prints. */
+.print-fab{position:fixed;right:28px;bottom:28px;width:54px;height:54px;border-radius:50%;
+	display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;
+	background:var(--accent);color:#fff;z-index:45;
+	box-shadow:0 6px 18px rgba(16,20,30,.28),0 2px 6px rgba(16,20,30,.18)}
+.print-fab:hover{transform:translateY(-1px);box-shadow:0 9px 24px rgba(16,20,30,.32),0 3px 8px rgba(16,20,30,.2)}
+.print-fab:active{transform:translateY(0)}
+.print-fab[hidden]{display:none}
+.print-fab .lucide{width:22px;height:22px}
+
 /* one view at a time on screen; print always shows the deck */
 .doc-mode.view-html .deck{display:none}
 .doc-mode:not(.view-html) .doc-html{display:none}
@@ -626,14 +638,18 @@ body.modal-open .main{overflow:hidden}
 .back-title{font-size:30px;font-weight:750;margin-bottom:10px}
 .back-text{color:var(--muted);max-width:72%;line-height:1.6}
 
-/* table of contents — entries only, dotted leaders, NO page numbers */
+/* table of contents — dotted leaders to page numbers computed from the deck's
+   own pagination (exact on screen and for the print command; a manual paper or
+   scale override in the print dialog can still repaginate) */
 .toc-title{font-size:30px;font-weight:750;margin:0}
 .toc-head{margin-bottom:9mm}
 .toc-head .ch-rule{margin-bottom:14px}
 .toc-entry{display:flex;align-items:baseline;gap:10px;padding:5px 0;font-size:14px;cursor:pointer}
 .toc-entry .toc-label{flex-shrink:1;min-width:0}
 .toc-entry .dots{flex:1;border-bottom:2px dotted var(--border);min-width:24px;transform:translateY(-3px)}
+.toc-entry .toc-num{flex:0 0 auto;min-width:1.6em;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
 .toc-entry.lvl0{font-weight:700;font-size:15px;margin-top:12px}
+.toc-entry.lvl0 .toc-num{color:var(--text)}
 .toc-entry.lvl2,.toc-entry.lvlB{padding-left:20px}
 .toc-entry.lvl3{padding-left:40px}
 .toc-entry:hover .toc-label{color:var(--doc-accent)}
@@ -658,6 +674,7 @@ body.modal-open .main{overflow:hidden}
    is injected per-canvas via a constructed stylesheet (CSSOM) in app.js. */
 @media print{
 	html{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+	.print-fab{display:none !important}
 	body:has(.deck) .topbar,
 	body:has(.deck) .sidebar,
 	body:has(.deck) .code-copy{display:none !important}

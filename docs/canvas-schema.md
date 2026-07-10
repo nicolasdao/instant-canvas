@@ -133,7 +133,7 @@ Shapes are registry-driven (`SHAPES.document*` in `schema.js`); `checkDocument` 
 - `page.margin` must be a millimeter length (`^\d+(\.\d+)?mm$`) — sheet geometry is computed in millimeters.
 - `cover.logo`/`backCover.logo` follow the markdown asset ladder: remote URLs are `REMOTE_ASSET_BLOCKED` (same message, same hint), the extension must be in `IMAGE_MIME`, `insideRoot` confines the path, existence is checked when the root is known; a `data:image/` URI passes through as-is. The kernel inlines logo files as `data:` URIs (`resolveDocumentAssets`, sharing `inlineImageFile` with markdown image inlining) and drops a logo it cannot inline rather than serving a broken image.
 
-**The TOC never shows page numbers, by design.** The `print` command is deterministic (the skill sets the paper), but Cmd+P never is — the human can pick Letter or 90 % scale in the dialog, silently repaginating. A number the dialog can falsify is a number the TOC must not print; entries with dotted leaders are honest in both paths.
+**TOC page numbers come from the deck's own pagination.** Because sheets are literal page boxes, the packer knows exactly which sheet every heading and block title landed on, and the TOC prints those numbers with dotted leaders. They are exact on screen, for `instantcanvas print`, and for Cmd+P at default settings. The honest caveat (which originally kept numbers out entirely — revisited at the user's request): a human who manually overrides paper size or scale *in the print dialog* can make Chrome repaginate, and printed numbers cannot follow. The `notes` in `catalog document` carry this caveat for agents.
 
 `text textarea secret email url tel number date datetime select radio checkbox checkboxGroup range hidden readonly`
 

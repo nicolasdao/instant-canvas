@@ -140,7 +140,7 @@ const SHAPES = {
 		},
 	},
 	documentToc: {
-		description: 'Table of contents sheet: markdown headings plus chart/table/kpi titles, in document order. Entries only — never page numbers, because the browser print dialog can repaginate (paper size, scale) and printed numbers must not lie.',
+		description: 'Table of contents sheet: markdown headings plus chart/table/kpi titles, in document order, with dotted leaders and page numbers computed from the deck\'s own pagination. Numbers are exact on screen and via `instantcanvas print`; a manual paper/scale override in the browser print dialog can still repaginate.',
 		properties: {
 			title: { type: 'string', default: 'Contents', description: 'TOC heading.' },
 			depth: { type: 'number', enum: [1, 2, 3], default: 2, description: 'Markdown heading levels listed (h1..h{depth}). Chart, table and kpi titles are always listed.' },

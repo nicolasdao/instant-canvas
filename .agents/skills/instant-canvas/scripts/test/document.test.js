@@ -199,7 +199,7 @@ test('catalog document: one schema with agent notes; its example validates clean
 	assert.ok(d.properties.cover.shape.properties.title.required, 'nested shapes render')
 	assert.ok(Array.isArray(d.notes) && d.notes.length >= 3)
 	assert.ok(d.notes.some((n) => /display-only/.test(n)))
-	assert.ok(d.notes.some((n) => /without page numbers/.test(n)))
+	assert.ok(d.notes.some((n) => /deck's own pagination/.test(n)), 'the TOC page-number honesty note is carried')
 	const r = validate(d.example)
 	assert.equal(r.ok, true, JSON.stringify(r.errors))
 	assert.deepEqual(r.warnings, [])
@@ -358,7 +358,8 @@ const VIEW_SNAPSHOT_JS = `
 		return {
 			toggleHidden: document.getElementById('viewToggle').hidden,
 			printBtnHidden: document.getElementById('printBtn').hidden,
-			printBtnLabel: document.getElementById('printBtn').textContent.trim(),
+			printBtnFloating: getComputedStyle(document.getElementById('printBtn')).position,
+			printBtnIsFab: document.getElementById('printBtn').classList.contains('print-fab'),
 			deckActive: document.getElementById('viewDeck').classList.contains('active'),
 			viewHtmlClass: !!(rootEl && rootEl.classList.contains('view-html')),
 			printing: !!(rootEl && rootEl.classList.contains('printing')),
@@ -448,8 +449,9 @@ test('document theming adds zero CSP violations, zero <style>, zero style="" in 
 test('the view toggle is visible for a document canvas, deck first', { skip: browserSkip, timeout: 120_000 }, () => {
 	const v = themeSnap.views.atDeck
 	assert.equal(v.toggleHidden, false, 'the toggle shows for a document canvas')
-	assert.equal(v.printBtnHidden, false, 'the Print button shows for a document canvas — the reader will not guess ⌘P')
-	assert.equal(v.printBtnLabel, 'Print', 'the button says what it does')
+	assert.equal(v.printBtnHidden, false, 'the print button shows for a document canvas — the reader will not guess ⌘P')
+	assert.equal(v.printBtnIsFab, true, 'it is the floating action button')
+	assert.equal(v.printBtnFloating, 'fixed', 'it floats (bottom-right), independent of scroll')
 	assert.equal(v.deckActive, true, 'the deck is the default view')
 	assert.notEqual(v.deckDisplay, 'none', 'the deck is on screen')
 	assert.equal(v.htmlDisplay, 'none', 'the continuous view is hidden')
@@ -498,6 +500,10 @@ const DECK_SNAPSHOT_JS = `
 			coverText: (document.querySelector('.sheet-cover') || {}).textContent || '',
 			tocIdx: sheets.findIndex((s) => !!s.querySelector('.toc-title')),
 			tocEntries: [...document.querySelectorAll('.toc-entry .toc-label')].map((e) => e.textContent),
+			tocRows: [...document.querySelectorAll('.toc-entry')].map((r) => ({
+				label: (r.querySelector('.toc-label') || {}).textContent || '',
+				num: (r.querySelector('.toc-num') || {}).textContent || '',
+			})),
 			backIdx: sheets.findIndex((s) => s.classList.contains('sheet-back')),
 			chapterSheets: [...document.querySelectorAll('.chapter-head')].map((h) => sheets.indexOf(h.closest('.sheet'))),
 			markerOne: sheets.findIndex((s) => s.textContent.includes('MARKER-CHAPTER-ONE-BODY')),
@@ -589,11 +595,17 @@ test('the markdown handbook packs into sheets: real tables, lists, fences, an in
 	assert.equal(pdfPageCount(handbookDrive.pdf), s.sheetCount, 'handbook prints 1:1')
 })
 
-test('TOC lists chapters, headings and block titles — and never page numbers', { skip: browserSkip, timeout: 120_000 }, () => {
-	const entries = deckDrive.snap.tocEntries
+test('TOC lists chapters, headings and block titles with their page numbers', { skip: browserSkip, timeout: 120_000 }, () => {
+	const s = deckDrive.snap
 	for (const expected of ['Operations', 'Growth', 'Quarter at a glance', 'Cost detail', 'Cost by service', 'Signups trend', 'Cost per region'])
-		assert.ok(entries.includes(expected), `TOC lists "${expected}" (got: ${entries.join(' | ')})`)
-	assert.ok(entries.every((t) => !/\d\s*$/.test(t)), 'no entry ends in a page number — Cmd+P can repaginate, numbers would lie')
+		assert.ok(s.tocEntries.includes(expected), `TOC lists "${expected}" (got: ${s.tocEntries.join(' | ')})`)
+	assert.ok(s.tocRows.length >= 7 && s.tocRows.every((r) => /^\d+$/.test(r.num)), `every entry carries a page number (${JSON.stringify(s.tocRows)})`)
+	// The numbers come from the deck's own pagination: a chapter's TOC number
+	// must equal the 1-based index of the sheet its chapter head landed on.
+	const numOf = (label) => Number((s.tocRows.find((r) => r.label === label) || {}).num)
+	assert.equal(numOf('Operations'), s.chapterSheets[0] + 1, 'chapter 1 number matches its sheet')
+	assert.equal(numOf('Growth'), s.chapterSheets[1] + 1, 'chapter 2 number matches its sheet')
+	assert.equal(numOf('Quarter at a glance'), s.markerOne + 1, 'a heading number matches the sheet its content is on')
 })
 
 test('running strips substitute {{pageNumber}}/{{totalPages}} and skip the covers', { skip: browserSkip, timeout: 120_000 }, () => {
