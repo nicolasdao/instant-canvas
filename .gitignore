@@ -37,6 +37,7 @@ temp/
 *.bak
 *.orig
 *.rej
+*.pdf
 
 # ─── Editors and IDEs ──────────────────────────────────────────────────────
 .vscode/
