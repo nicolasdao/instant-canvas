@@ -357,6 +357,8 @@ const VIEW_SNAPSHOT_JS = `
 		const gd = document.querySelector('.js-plotly-plot');
 		return {
 			toggleHidden: document.getElementById('viewToggle').hidden,
+			printBtnHidden: document.getElementById('printBtn').hidden,
+			printBtnLabel: document.getElementById('printBtn').textContent.trim(),
 			deckActive: document.getElementById('viewDeck').classList.contains('active'),
 			viewHtmlClass: !!(rootEl && rootEl.classList.contains('view-html')),
 			printing: !!(rootEl && rootEl.classList.contains('printing')),
@@ -446,6 +448,8 @@ test('document theming adds zero CSP violations, zero <style>, zero style="" in 
 test('the view toggle is visible for a document canvas, deck first', { skip: browserSkip, timeout: 120_000 }, () => {
 	const v = themeSnap.views.atDeck
 	assert.equal(v.toggleHidden, false, 'the toggle shows for a document canvas')
+	assert.equal(v.printBtnHidden, false, 'the Print button shows for a document canvas — the reader will not guess ⌘P')
+	assert.equal(v.printBtnLabel, 'Print', 'the button says what it does')
 	assert.equal(v.deckActive, true, 'the deck is the default view')
 	assert.notEqual(v.deckDisplay, 'none', 'the deck is on screen')
 	assert.equal(v.htmlDisplay, 'none', 'the continuous view is hidden')

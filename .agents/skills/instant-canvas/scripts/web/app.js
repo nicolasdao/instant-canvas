@@ -302,6 +302,12 @@ $('themeBtn').addEventListener('click', () => {
 $('viewDeck').addEventListener('click', () => switchDocView('deck'))
 $('viewHtml').addEventListener('click', () => switchDocView('html'))
 
+// The reader did not choose this tool and will not read a manual: give the
+// document's main action a visible button. window.print() opens the native
+// dialog (where "Save as PDF" lives) and fires beforeprint, so the chart
+// relocation below covers this path too.
+$('printBtn').addEventListener('click', () => window.print())
+
 // Cmd+P must print the DECK even from the continuous view: print CSS already
 // shows the deck and hides the rest, so all beforeprint has to do is move the
 // live chart nodes into the deck's slots (cheap, synchronous). The .printing
@@ -2100,6 +2106,7 @@ function moveChartsTo(rootEl, view) {
 function syncViewToggle() {
 	const isDoc = !!(state.activeId && state.canvasDoc && state.canvasDoc.document && typeof state.canvasDoc.document === 'object')
 	$('viewToggle').hidden = !isDoc
+	$('printBtn').hidden = !isDoc
 	$('viewDeck').classList.toggle('active', state.docView === 'deck')
 	$('viewHtml').classList.toggle('active', state.docView !== 'deck')
 }
