@@ -5,6 +5,7 @@ source:
   - .agents/skills/instant-canvas/scripts/lib/schema.js
   - .agents/skills/instant-canvas/scripts/lib/validate.js
   - .agents/skills/instant-canvas/scripts/lib/catalog.js
+  - .agents/skills/instant-canvas/scripts/lib/markdownsrc.js
 ---
 
 # Canvas Schema, Validator, and Catalog
@@ -28,12 +29,26 @@ A canvas holds **at most one interactive block** (`form` or `confirm`) across al
 
 | Type | Kind | Notes |
 |---|---|---|
-| `markdown` | display | Exactly one of inline `text` XOR `src` (workspace-confined path, inlined server-side). Rendered with `html: false`. |
+| `markdown` | display | Exactly one of inline `text` XOR `src`. Rendered with `html: false`. See [the markdown block](#the-markdown-block) below. |
 | `kpi` | display | Cards with `format` (number/currency/percent/none) and `delta` (signed fraction; green iff sign matches `positiveIs`; ~0 renders flat). |
 | `chart` | display | See chart kinds below. |
 | `table` | display | Columns with per-column `format` and `align`; numeric formats right-align with tabular numerals. |
 | `form` | interactive | Fields + destination + optional fieldset layout. See [security.md](security.md) for the write path. |
 | `confirm` | interactive | Severity-styled card (`info`/`warning`/`danger`); resolves `confirmed: true/false`. |
+
+## The markdown block
+
+A document renderer, not a caption renderer. `src` is restricted to a **`.md` / `.mdx` / `.markdown`** allowlist (case-insensitive), enforced in **both** `validate.js` and `kernel.js` — a canvas can reach the kernel without ever passing the CLI, so both surfaces guard. Before this, `src` accepted any workspace file and rendered it, so `{"type":"markdown","src":".env"}` displayed the workspace's secrets. A `src` that does not resolve to a readable file is a `MISSING_SOURCE` error at validate time, never a render-time `*(not found)*`.
+
+`.mdx` is **read, never evaluated**. Its YAML frontmatter is stripped and the static prose renders; `import`/`export`/`<Component/>` produce a `MDX_NOT_RENDERED` warning naming the lines. Raw HTML stays dropped (`html:false`) and warns via `RAW_HTML_NOT_RENDERED`. Both are warnings because the prose around them still renders.
+
+**The asset rule** — the line every asset decision follows:
+
+> The runtime never reaches off-origin and never evaluates code. External or dynamic inputs are the agent's job to resolve, at authoring time, into local static CSP-safe data. The skill renders only already-local data.
+
+So a remote image (`![](https://…)` or a raw `<img src="https://…">`) is a **`REMOTE_ASSET_BLOCKED` error**, not a silent broken image: the CSP would block the request anyway, and the agent is the only party that can still fix it. The error teaches the fix, and the `catalog markdown` `notes` carry the storage lifecycle the agent owns — inline as a `data:` URI for a disposable canvas, a workspace-local file beside a durable report. A path *outside* the workspace root cannot be referenced at all (`insideRoot`), so "outside the project" means "inline as `data:`".
+
+Workspace-local images **are** inlined, server-side, as `data:` URIs in the same pass that inlines `src` (see [frontend.md](frontend.md)); the browser only ever sees `data:` or a labeled fallback. The source scan blanks fenced and inline code first, so a README that documents `<table>` or a ```` ```jsx ```` sample is never warned about the code it merely quotes.
 
 ## Chart kinds (26)
 
@@ -91,7 +106,7 @@ Common shape: `{name, label, type, required?, placeholder?, help?, default?, opt
 
 `validate(source, {root})` collects **all** errors in one pass — never fail-fast, never throws for spec problems. Every error carries `code`, `path` (e.g. `pages[1].blocks[0].encoding.y[1]`), `message`, and usually `got`, `expected`, a Levenshtein/alias-driven `hint` ("Did you mean \"range\"?"), and a correct `example`. Unknown properties are **warnings**, not errors. `INVALID_JSON` includes line/column. This is the deterministic half of the agentic loop: the agent writes, the validator names the exact defect and its fix, the agent retries until `{"ok": true}`.
 
-Error codes: `INVALID_JSON, INVALID_SPEC, UNSUPPORTED_VERSION, UNKNOWN_BLOCK_TYPE, UNKNOWN_FIELD_TYPE, UNKNOWN_PROPERTY(warn), MISSING_REQUIRED_PROPERTY, INVALID_PROPERTY_TYPE, INVALID_ENUM_VALUE, DUPLICATE_FIELD_NAME, MULTIPLE_INTERACTIVE_BLOCKS, ENCODING_KEY_NOT_IN_DATA, INVALID_ENV_KEY, PATH_OUTSIDE_WORKSPACE` — plus runtime codes surfaced by the CLI/kernel: `SECRET_RETURN_BLOCKED, WRITE_FAILED, SESSION_TIMEOUT, KERNEL_UNREACHABLE, BROWSER_OPEN_FAILED(warn), INTERNAL_ERROR`.
+Error codes: `INVALID_JSON, INVALID_SPEC, UNSUPPORTED_VERSION, UNKNOWN_BLOCK_TYPE, UNKNOWN_FIELD_TYPE, UNKNOWN_PROPERTY(warn), MISSING_REQUIRED_PROPERTY, INVALID_PROPERTY_TYPE, INVALID_ENUM_VALUE, DUPLICATE_FIELD_NAME, MULTIPLE_INTERACTIVE_BLOCKS, ENCODING_KEY_NOT_IN_DATA, INVALID_ENV_KEY, PATH_OUTSIDE_WORKSPACE, MISSING_SOURCE, REMOTE_ASSET_BLOCKED, MDX_NOT_RENDERED(warn), RAW_HTML_NOT_RENDERED(warn)` — plus runtime codes surfaced by the CLI/kernel: `SECRET_RETURN_BLOCKED, WRITE_FAILED, SESSION_TIMEOUT, KERNEL_UNREACHABLE, BROWSER_OPEN_FAILED(warn), INTERNAL_ERROR`.
 
 ## Catalog: progressive disclosure
 

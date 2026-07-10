@@ -16,6 +16,12 @@ source:
 
 **Plotly trips this too.** Its colorbar writes `setAttribute('style', …)` on `rect.cbfill`, producing a violation per colorbar. `csp-shim.js` reroutes every `setAttribute('style', …)` to `el.style.cssText` (CSSOM, exempt) and turns empty writes into `removeAttribute`. Verified: violations go from 13 to 0 and the colorbar still renders.
 
+**markdown-it trips it too, and nobody noticed for months.** A `|---:|` column alignment renders as `<th style="text-align:right">`, so every aligned markdown table silently lost its alignment *and* logged a CSP violation. The fix is a `core.ruler` rule that rewrites the `style` attribute into a `.ta-right` class before the token reaches the DOM. The lesson generalizes: **any third-party HTML generator is a CSP suspect**, because the failure mode is silence. Assert `document.querySelectorAll('.md [style]').length === 0` in the browser test, not just "it looked fine."
+
+## Shiki cannot be used for syntax highlighting, and it is not about size
+
+Shiki produces beautiful output by writing an inline `style=` on **every token**. Under `style-src 'self'` every one of those is dropped, so the code renders as unstyled monospace with nothing in the console explaining why. **highlight.js emits class names**, which is the only reason it works here. The theme therefore lives in `styles.css` behind `--code-*` tokens — never a vendored hljs stylesheet, and never an injected `<style>` element, which `render.test.js` asserts is always zero. When evaluating any future rendering library, the first question is *classes or inline styles*, not bundle size.
+
 ## Plotly injects a `<style>` element unless you claim its id
 
 At load, Plotly's `addRelatedStyleRule` (`src/lib/dom.js`) creates `<style id="plotly.js-style-global">` and calls `insertRule()`. `style-src 'self'` blocks the stylesheet, so chrome degrades and the console fills with warnings — the bundle even ships the string *"Cannot addRelatedStyleRule, probably due to strict CSP…"*. Plotly's own escape hatch: if an element with that id already exists **and matches `.no-inline-styles`**, it returns early. `csp-shim.js` plants a `<div>` (never a `<style>`, so no stylesheet is created to block) and the rules arrive instead from the vendored `plotly.css` `<link>`, which is `'self'`. It must load **before** `plotly.min.js`. A second, content-hash-id'd `<style>` comes from maplibre's CSS, which esbuild inlines even with no map trace bundled — stub that id too.

@@ -5,6 +5,7 @@ source:
   - .agents/skills/instant-canvas/scripts/lib/redact.js
   - .agents/skills/instant-canvas/scripts/lib/envfile.js
   - .agents/skills/instant-canvas/scripts/lib/jsonfile.js
+  - .agents/skills/instant-canvas/scripts/lib/markdownsrc.js
   - .agents/skills/instant-canvas/scripts/kernel.js
 ---
 
@@ -34,7 +35,9 @@ InstantCanvas keeps secrets out of the agent conversation **during capture**: th
 - Loopback only: the literal `127.0.0.1`, no network mode, no HTTPS, no CORS.
 - Per-kernel random 32-byte token on every route except `/healthz`, compared timing-safely. Kill the kernel, the token dies with it.
 - Host-header allowlist defeats DNS rebinding; strict CSP (`default-src 'none'`) confines the page to same-origin scripts/styles and the kernel's own WebSocket.
-- Path traversal is blocked at every file-touching surface: `/assets/` normalization, canvas paths, markdown `src`, and destination paths all go through `insideRoot()` (`lib/paths.js`), which realpaths the deepest existing ancestor — defeating both `../` traversal and symlink escapes, including for files that do not exist yet.
+- Path traversal is blocked at every file-touching surface: `/assets/` normalization, canvas paths, markdown `src`, markdown image references, and destination paths all go through `insideRoot()` (`lib/paths.js`), which realpaths the deepest existing ancestor — defeating both `../` traversal and symlink escapes, including for files that do not exist yet.
+- **Confinement is not enough on its own: a markdown `src` is also restricted to a `.md`/`.mdx`/`.markdown` allowlist.** `.env` lives *inside* the workspace, so `insideRoot()` happily admitted it and the block rendered the file. The allowlist is enforced in `lib/markdownsrc.js` and applied by both the validator and the kernel, because a canvas can reach the kernel without passing the CLI.
+- **The runtime never fetches.** The kernel's only outbound request is its own `127.0.0.1/healthz`. Remote assets in markdown are rejected at validate time (`REMOTE_ASSET_BLOCKED`) rather than proxied, and workspace-local images are inlined as `data:` URIs server-side. This deletes SSRF and phone-home at the source: the download happens once, at authoring time, by the agent — outside this software entirely.
 
 ## What this does NOT protect against
 

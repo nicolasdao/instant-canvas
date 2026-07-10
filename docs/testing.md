@@ -14,7 +14,7 @@ cd .agents/skills/instant-canvas
 node --test scripts/test/
 ```
 
-101 tests at last count, eighteen of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
+121 tests at last count, twenty-one of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
 
 ## Suite layout
 
@@ -25,12 +25,13 @@ node --test scripts/test/
 | `redact.test.js` | Every redaction pattern plus registered exact values. |
 | `registry.test.js` | Health-ping liveness, stale-entry cleanup, spawn-lock contention and stale-lock breaking. |
 | `validate.test.js` / `catalog.test.js` | Every validator error code; per-kind chart rules; fieldset/ui/span rules; lean-vs-full catalog; the registry-tweak drift test. |
+| `markdownsrc.test.js` | The markdown `src` extension allowlist and the kernel-side read guard (`src: ".env"` is never read), frontmatter stripping, and `data:`-URI image inlining with its confinement, size-cap, and fenced-code exclusions. |
 | `scan.test.js` | Marker discrimination, 2-level depth, ordering; session lifecycle. |
 | `kernel.test.js` | A real spawned kernel: healthz, 403s (token, Host), asset traversal, tree, WS round-trip, sessions, collection delete, shutdown. |
 | `cli.test.js` | Usage/exit codes, validate/catalog output, the full open lifecycle including kill -9 recovery and `--result`. |
 | `forms.test.js` | Blocking `open` + HTTP submit: `.env` round-trip with redaction sweep, overwrite/outside-root 409 handshakes, confirm/timeout/cancel, json destinations, url-protocol and patternMessage rules. |
 | `hardening.test.js` | Source scans (loopback literal, no third-party requires, timing-safe compare, no CORS, no `console.log` server-side) and runtime error codes (`WRITE_FAILED`, `SESSION_TIMEOUT`, `KERNEL_UNREACHABLE`). |
-| `render.test.js` | Real headless Chrome via `helpers/cdp.js`: an adversarial canvas (splom + violin + 3D + skill-rendered kinds + a sweep) must draw every chart, expose a slider, and log zero CSP violations. Skips without Chrome. |
+| `render.test.js` | Real headless Chrome via `helpers/cdp.js`: an adversarial canvas (splom + violin + 3D + skill-rendered kinds + a sweep + a markdown document) must draw every chart, expose a slider, highlight fenced code, inline a local image as a `data:` URI, carry **no** `style=""` attribute, and log zero CSP violations. Skips without Chrome. |
 | `browse.test.js` | Real headless Chrome: the folder-browser modal must list, select without re-listing, and descend by chevron, double-click, and breadcrumb. Skips without Chrome. |
 | `search.test.js` | Real headless Chrome: the search modal must open without fetching, match on name and folder, survive `c++` and `<script>` queries, never mark inside an entity, and wire ⌘K / `/` / arrows / Esc correctly. Skips without Chrome. |
 

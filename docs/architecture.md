@@ -59,7 +59,7 @@ The token reaches the browser via `__IC_TOKEN__` placeholder substitution when t
 | `GET /healthz` | Liveness + identity: `{ok, name, version, workspace, pid, pendingSessions}`. Tokenless. |
 | `GET /`, `GET /assets/*` | App shell and static files (path-normalized; traversal blocked). |
 | `GET /api/workspace` | Scanned canvas tree (see below). |
-| `GET /api/canvas?path=` | Parse + validate one canvas; markdown `src` files are inlined server-side; includes the active session if any. |
+| `GET /api/canvas?path=` | Parse + validate one canvas; markdown `src` files **and their workspace-local images** are inlined server-side (images as `data:` URIs — the browser never fetches); includes the active session if any. |
 | `POST /api/open` | CLI entry: display → broadcast `navigate`; interactive → create a session. |
 | `GET/POST /api/session/<id>[/submit|/cancel]` | Poll, submit (server-side re-validation + destination write), cancel. |
 | `POST /api/browse` | Folder-browser listing (dirs only, canvas counts). |

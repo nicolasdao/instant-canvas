@@ -14,7 +14,7 @@ Ordered — when two conflict, the higher one wins.
 2. **Lean context over completeness** — the skill is large (a full runtime, 26 chart kinds, 16 field types), but the agent's context window is sacred. Progressive disclosure everywhere: a ~6 KB lean index first, one exact schema on demand, never the full contract unless explicitly requested.
 3. **Deterministic validation over model judgment** — a program, not a prompt, decides whether a canvas is correct, and its errors teach the fix (code, path, message, hint, example). The agent loops against the validator until the canvas is perfect.
 4. **Secrets on disk over secrets in chat** — captured values are written to local files and redacted from every result, log, and error. The agent learns field names, never values.
-5. **Zero dependencies over feature velocity** — plain Node ≥ 20, three vendored browser files, no build step, no npm install. Every feature must earn its place without a dependency.
+5. **Zero dependencies over feature velocity** — plain Node ≥ 20, four vendored browser files, no build step, no npm install. Every feature must earn its place without a dependency.
 
 ## Non-goals
 

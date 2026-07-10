@@ -27,7 +27,7 @@ Instead of maintaining an answers *warehouse* (pre-built admin panels), agents d
 Two design commitments run through everything:
 
 - **Progressive disclosure.** The skill is large (26 chart kinds, 16 field types, a full form-layout system), but agents never load it wholesale: `catalog` returns a ~6 KB lean index; `catalog <name>` returns exactly one schema; the deterministic validator turns mistakes into self-explanatory fixes.
-- **Zero dependencies.** Plain Node ≥ 20, built-in `http`, a hand-rolled WebSocket server, vendored browser files (a custom strict Plotly.js build, its stylesheet, markdown-it). No build step, no npm install — rebuilding the Plotly bundle is a maintainer-only task, documented in `scripts/web/vendor/VENDORED.md`.
+- **Zero dependencies.** Plain Node ≥ 20, built-in `http`, a hand-rolled WebSocket server, four vendored browser files (a custom strict Plotly.js build, its stylesheet, markdown-it, and a full highlight.js). Node itself `require`s none of them. No build step, no npm install — rebuilding the Plotly and highlight.js bundles is a maintainer-only task, documented in `scripts/web/vendor/VENDORED.md`.
 
 ## Getting Started
 
@@ -51,7 +51,7 @@ node scripts/instantcanvas.js open my.canvas.json       # one JSON result on std
 node scripts/instantcanvas.js status
 node scripts/instantcanvas.js stop
 
-# tests (101, zero deps; the browser tests skip without Chrome)
+# tests (121, zero deps; the browser tests skip without Chrome)
 node --test scripts/test/
 ```
 
@@ -68,7 +68,7 @@ node --test scripts/test/
     instantcanvas.js             CLI: open | validate | catalog | status | stop
     kernel.js                    Per-workspace localhost server (HTTP + hand-rolled WS)
     lib/                         schema/validate/catalog, registry, redact, envfile, …
-    web/                         Browser app (no framework) + csp-shim + vendored Plotly/markdown-it
+    web/                         Browser app (no framework) + csp-shim + vendored Plotly/markdown-it/highlight.js
     test/                        node:test suite + fixtures + a zero-dep CDP client
 demos/                           WORKBENCH — showcase canvases (chart gallery, science gallery, sweep gallery, form kitchen sink, …)
 prototype/index.html             WORKBENCH — original user-approved UI reference (read-only)

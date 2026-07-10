@@ -493,12 +493,18 @@ SHAPES.field.properties.type.enum = Object.keys(FIELD_TYPES)
 const BLOCKS = {
 	markdown: {
 		kind: 'display',
-		description: 'Markdown content (rendered with html disabled). Exactly one of "text" (inline) or "src" (path to a .md file inside the workspace).',
+		description: 'Markdown rendered as a document (raw HTML disabled). Exactly one of "text" (inline) or "src" (a workspace-confined .md, .mdx or .markdown file). Fenced code is syntax-highlighted. An .mdx file renders as static markdown: frontmatter is stripped, JSX and imports are ignored with a warning.',
 		aliases: ['md', 'text'],
+		notes: [
+			'Remote assets are never fetched — the canvas cannot reach off-origin, by design. Download the asset yourself, then reference a local form.',
+			'Disposable canvas: inline the asset as a data: URI — ![alt](data:image/png;base64,...). Nothing lands in the user\'s project, and deleting the canvas removes everything. Keep it small: a canvas file is capped at 2 MB.',
+			'Durable report: save the asset to a workspace-local file beside the canvas and reference its relative path. Local images are inlined server-side, so the report stays a portable bundle.',
+			'A path outside the workspace root cannot be referenced. "Outside the project" therefore means inline as a data: URI, not a temp-folder path.',
+		],
 		properties: {
 			type: { type: 'string', required: true, enum: ['markdown'] },
 			text: { type: 'string', description: 'Inline markdown. XOR with "src".', example: '## Hi **there**' },
-			src: { type: 'string', description: 'Workspace-relative path to a markdown file. XOR with "text".', example: 'notes/summary.md' },
+			src: { type: 'string', description: 'Workspace-relative path to a .md, .mdx or .markdown file — the only file types a canvas will read. XOR with "text".', example: 'notes/summary.md' },
 		},
 		example: { type: 'markdown', text: '## Executive summary\nSpend was up **12% QoQ**.' },
 	},

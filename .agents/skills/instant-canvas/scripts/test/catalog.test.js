@@ -36,6 +36,21 @@ test('catalog --full still exposes the complete contract', () => {
 	assert.ok(full.fieldsetShape.properties.columns)
 })
 
+test('catalog markdown carries the asset rule, and the lean index does not', () => {
+	// The agent needs the storage-lifecycle contract exactly when it asks for the
+	// block — progressive disclosure, so the ~6 KB index must stay a one-liner.
+	const md = catalog('markdown')
+	assert.ok(Array.isArray(md.notes) && md.notes.length >= 3, 'the block contract carries the asset rule')
+	assert.ok(md.notes.some((n) => /never fetched/.test(n)), 'remote assets are never fetched')
+	assert.ok(md.notes.some((n) => /data:/.test(n)), 'disposable → inline as a data: URI')
+	assert.ok(md.notes.some((n) => /outside the workspace root cannot be referenced/i.test(n)))
+	assert.match(md.properties.src.description, /\.md, \.mdx or \.markdown/)
+
+	const lean = catalog()
+	assert.equal(typeof lean.blocks.markdown, 'string', 'the index stays a one-liner')
+	assert.ok(!/data:/.test(lean.blocks.markdown), 'the asset rule does not leak into the index')
+})
+
 test('catalog(name) returns exactly one schema: block, chart kind, field type, fieldset, envelope', () => {
 	const chart = catalog('chart')
 	assert.equal(chart.block, 'chart')

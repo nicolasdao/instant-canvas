@@ -12,7 +12,7 @@ source:
 
 `release`/`publish` bundles the **entire** `.agents/skills/instant-canvas/` folder; whatever you drop in there reaches every consumer and competes for their agents' context. That is why this repo splits **product** (the skill folder: SKILL.md, scripts, examples, vendored assets) from **workbench** (repo-level `docs/`, `specs/`, `prototype/`, `demos/`, tooling). Never add design notes, specs, test tooling, or dev docs inside the skill folder — put them at the repo level. The inverse also holds: anything a consumer needs must live *inside* the skill folder, because the published bundle is all they get.
 
-Note that `scripts/test/` (~112 KB, and growing — the three browser tests and their CDP client landed there) currently ships, because the walker in `file_size_rules.js` skips only dotfiles and `node_modules`. It grew ~24 KB the session `browse.test.js` and `search.test.js` were added; re-measure rather than trust this figure.
+Note that `scripts/test/` (~172 KB, and growing — the three browser tests and their CDP client landed there) currently ships, because the walker in `file_size_rules.js` skips only dotfiles and `node_modules`. Re-measure rather than trust this figure.
 
 ## Two size caps, and the per-file one is the sharp edge
 
@@ -22,6 +22,8 @@ Note that `scripts/test/` (~112 KB, and growing — the three browser tests and 
 - `MAX_FILE_SIZE` — **each individual file**
 
 They are bumped independently. The vendored Plotly build is ~2.64 MB in one file, so **both** caps must clear it; a total-cap raise alone is not enough. Confirm the current constants before assuming a build will publish — the historical 1 MB per-file cap would reject `plotly.min.js` outright.
+
+Measured against `happyskills@1.20.1` (`MAX_FILE_SIZE` 1 MB, `MAX_TOTAL_SIZE` 2 MB), this skill **does not publish today**: the bundle is ~4.4 MB, and two single files exceed the per-file cap — `plotly.min.js` (~2.64 MB) and `highlight.min.js` (~1.03 MB). Raising the caps is tracked as its own piece of work; do not "fix" it by shrinking a vendored bundle, because both builds are load-bearing (strict Plotly, class-emitting highlight.js).
 
 ## The vendored Plotly build is not interchangeable with a published dist
 

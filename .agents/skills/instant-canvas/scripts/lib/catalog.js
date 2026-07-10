@@ -43,6 +43,7 @@ function renderBlock(name, def) {
 	return {
 		kind: def.kind,
 		description: def.description,
+		...(def.notes ? { notes: def.notes } : {}),
 		properties: renderProperties(def.properties),
 		...(def.example !== undefined ? { example: def.example } : {}),
 	}
