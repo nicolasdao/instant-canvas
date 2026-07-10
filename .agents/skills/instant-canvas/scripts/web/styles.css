@@ -45,6 +45,13 @@
 	}
 }
 @media (max-width:720px){ :root{ --gutter:16px } }
+
+/* Document mode (paper). Sheets are always light, so these tokens do NOT vary
+   with the app theme and deliberately live outside the three theme blocks
+   above. Per-canvas values from document.theme (validated strict hex) override
+   them via CSSOM setProperty in applyDocumentTheme(). */
+.doc-mode{ --doc-accent:#6366f1 }
+
 *{box-sizing:border-box}
 
 /* Lucide icons: inline SVG, stroke = currentColor, sized by context */

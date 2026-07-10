@@ -251,7 +251,38 @@ function currentTheme() {
 	return matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'
 }
 
-const palette = () => (currentTheme() === 'dark' ? DARK : LIGHT)
+/** LIGHT composed with the document's brand colors. Plotly cannot read CSS
+ *  variables, so the brand colorway must be compiled into the template — the
+ *  --doc-* tokens alone would leave every chart indigo (the second sink). */
+function documentPalette(t) {
+	const theme = t && typeof t === 'object' ? t : {}
+	const color = Array.isArray(theme.palette) && theme.palette.length ? theme.palette
+		: theme.accent ? [theme.accent, ...LIGHT.color.slice(1)]
+			: LIGHT.color
+	return { ...LIGHT, color, ramp: color[0] === LIGHT.color[0] ? LIGHT.ramp : withAlpha(color[0], 0.12) }
+}
+
+function palette() {
+	// Sheets are paper: a document canvas charts on LIGHT plus its brand
+	// colorway regardless of the app theme (sheets are always light). The app
+	// chrome around the deck still follows the app theme via CSS variables.
+	const doc = state.canvasDoc && state.canvasDoc.document
+	if (doc && typeof doc === 'object')
+		return documentPalette(doc.theme)
+	return currentTheme() === 'dark' ? DARK : LIGHT
+}
+
+/** Brand tokens reach the page as CSS custom properties set through CSSOM —
+ *  the CSP drops style="" attributes but exempts programmatic assignment.
+ *  Colors were validated to strict hex, and are still treated as opaque
+ *  strings handed to setProperty, never interpolated into markup. */
+function applyDocumentTheme(el, doc) {
+	const t = (doc && doc.theme) || {}
+	if (t.accent)
+		el.style.setProperty('--doc-accent', t.accent)
+	const colors = Array.isArray(t.palette) && t.palette.length ? t.palette : t.accent ? [t.accent] : []
+	colors.slice(0, 8).forEach((c, i) => el.style.setProperty('--doc-c' + (i + 1), c))
+}
 
 $('themeBtn').addEventListener('click', () => {
 	const next = currentTheme() === 'dark' ? 'light' : 'dark'
@@ -1534,10 +1565,13 @@ async function renderCanvas() {
 		return ''
 	}).join('')
 
-	main.innerHTML = `<div class="canvas">
+	const isDoc = canvas.document && typeof canvas.document === 'object'
+	main.innerHTML = `<div class="canvas${isDoc ? ' doc-mode' : ''}">
 		<div class="canvas-head"><h1>${esc(canvas.title)}</h1><div class="sub">${esc(state.activeId)}</div></div>
 		${tabs}${inner}
 	</div>`
+	if (isDoc)
+		applyDocumentTheme(main.querySelector('.doc-mode'), canvas.document)
 	mountCodeCopy(main)
 	mountCharts(blocks)
 	wireInteractive(blocks)

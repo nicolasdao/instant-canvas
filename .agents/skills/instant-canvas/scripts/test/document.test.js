@@ -21,9 +21,12 @@ const registry = require('../lib/registry')
 const { validate } = require('../lib/validate')
 const { catalog } = require('../lib/catalog')
 const { SKILL_VERSION } = require('../lib/skillmeta')
+const { withChrome, findChrome, sleep: cdpSleep } = require('./helpers/cdp')
 
 const KERNEL = path.join(__dirname, '..', 'kernel.js')
 const FIXTURES = path.join(__dirname, 'fixtures')
+const CHROME = findChrome()
+const browserSkip = CHROME ? false : 'Chrome not found — set CHROME_PATH to run the document browser tests'
 
 const codes = (r) => r.errors.map((e) => e.code)
 const warns = (r) => r.warnings.map((w) => w.code)
@@ -240,6 +243,18 @@ test.before(async () => {
 		document: { cover: { title: 'Big logo', logo: 'assets/big.png' } },
 		blocks: [{ type: 'markdown', text: '# Hi' }],
 	}))
+	// A single-page themed canvas for the browser theme assertions: a two-series
+	// line chart whose traces must paint in the brand palette, in order.
+	fs.writeFileSync(path.join(root, 'themed.canvas.json'), JSON.stringify({
+		instantcanvas: 1,
+		createdWith: '0.1.0',
+		title: 'Themed document',
+		document: { theme: { accent: '#0054fe', palette: ['#0054fe', '#00b4d8'] } },
+		blocks: [
+			{ type: 'markdown', text: '# Themed' },
+			{ type: 'chart', kind: 'line', title: 'Trend', data: [{ x: 'a', y: 1, y2: 2 }, { x: 'b', y: 3, y2: 1 }], encoding: { x: 'x', y: ['y', 'y2'] } },
+		],
+	}))
 	K.root = root
 	K.child = spawn(process.execPath, [KERNEL, root], {
 		env: { ...process.env, INSTANTCANVAS_STATE_DIR: STATE_DIR },
@@ -251,12 +266,16 @@ test.before(async () => {
 		if (entry) {
 			K.port = entry.port
 			K.token = entry.token
-			return
+			break
 		}
 		await sleep(150)
 	}
-	K.child.kill('SIGKILL')
-	throw new Error('kernel did not come up')
+	if (!K.port) {
+		K.child.kill('SIGKILL')
+		throw new Error('kernel did not come up')
+	}
+	if (CHROME)
+		themeSnap = await driveThemedCanvas()
 })
 
 test.after(() => {
@@ -280,4 +299,84 @@ test('kernel drops a logo it cannot inline instead of serving a broken image', a
 	assert.equal(r.status, 200, r.text)
 	assert.equal(r.json.canvas.document.cover.logo, undefined)
 	assert.equal(r.json.canvas.document.cover.title, 'Big logo')
+})
+
+// ---------------------------------------------------------------- browser: theme engine
+
+// Installed before any page script, so it sees violations from Plotly's own load.
+const PROBE = `
+	window.__csp = [];
+	document.addEventListener('securitypolicyviolation',
+		(e) => window.__csp.push(e.effectiveDirective || e.violatedDirective));
+`
+
+const SNAPSHOT_JS = `
+	(() => {
+		const rootEl = document.querySelector('.canvas.doc-mode');
+		const gd = document.querySelector('.js-plotly-plot');
+		const cs = rootEl ? getComputedStyle(rootEl) : null;
+		return {
+			docMode: !!rootEl,
+			accent: cs ? cs.getPropertyValue('--doc-accent').trim() : null,
+			c2: cs ? cs.getPropertyValue('--doc-c2').trim() : null,
+			traceColors: gd && gd._fullData ? gd._fullData.map((t) => t.line && t.line.color) : [],
+			// Same resolution as the app's currentTheme(): forced attribute, else the
+			// media query (headless Chrome may default to dark).
+			appTheme: document.documentElement.getAttribute('data-theme')
+				|| (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light'),
+			csp: window.__csp || [],
+			styleEls: document.querySelectorAll('style').length,
+			offenders: [...document.querySelectorAll('.canvas [style]')]
+				.filter((el) => !el.closest('.chart-box')).map((el) => el.className).slice(0, 5),
+		};
+	})()
+`
+
+let themeSnap = null
+
+async function driveThemedCanvas() {
+	const url = `http://127.0.0.1:${K.port}/?token=${encodeURIComponent(K.token)}#/c/${encodeURIComponent('themed.canvas.json')}`
+	return withChrome(CHROME, url, { onNewDocument: PROBE }, async ({ evaluate }) => {
+		const deadline = Date.now() + 30_000
+		for (;;) {
+			// Poll for the APP, not just an element: the shell exists before app.js
+			// binds anything (documented testing gotcha).
+			const ready = await evaluate(`(() => !!(window.ic && window.ic.state.tree
+				&& document.querySelector('.canvas.doc-mode')
+				&& document.querySelectorAll('.js-plotly-plot .main-svg').length >= 1))()`).catch(() => false)
+			if (ready || Date.now() > deadline)
+				break
+			await cdpSleep(250)
+		}
+		await cdpSleep(800)
+		const light = await evaluate(SNAPSHOT_JS)
+		// Sheets are light always: flip the app dark and the document must not care.
+		await evaluate(`(() => { document.getElementById('themeBtn').click(); return true })()`)
+		await cdpSleep(1200)
+		const dark = await evaluate(SNAPSHOT_JS)
+		return { light, dark }
+	})
+}
+
+test('document theme: --doc-* tokens land via CSSOM and charts paint the brand palette', { skip: browserSkip, timeout: 120_000 }, () => {
+	const s = themeSnap.light
+	assert.equal(s.docMode, true, 'the canvas rendered in document mode')
+	assert.equal(s.accent, '#0054fe', 'computed --doc-accent carries the brand accent')
+	assert.equal(s.c2, '#00b4d8', 'palette slot tokens are set')
+	// The second sink: Plotly cannot read CSS variables, so the brand palette
+	// must arrive compiled into the template — trace colors prove it did.
+	assert.deepEqual(s.traceColors, ['#0054fe', '#00b4d8'])
+})
+
+test('the app theme toggling never reaches the document: brand palette and tokens hold', { skip: browserSkip, timeout: 120_000 }, () => {
+	assert.notEqual(themeSnap.dark.appTheme, themeSnap.light.appTheme, 'the app theme actually toggled')
+	assert.deepEqual(themeSnap.dark.traceColors, ['#0054fe', '#00b4d8'], 'retheme kept the brand palette, not the app palette')
+	assert.equal(themeSnap.dark.accent, '#0054fe', 'CSSOM tokens survive the retheme')
+})
+
+test('document theming adds zero CSP violations, zero <style>, zero style="" in deck markup', { skip: browserSkip, timeout: 120_000 }, () => {
+	assert.deepEqual(themeSnap.light.csp, [], 'no violations after load')
+	assert.deepEqual(themeSnap.dark.csp, [], 'no violations after retheme')
+	assert.equal(themeSnap.light.styleEls, 0, 'no <style> element reached the document')
+	assert.deepEqual(themeSnap.light.offenders, [], 'no style="" attribute outside chart internals')
 })
