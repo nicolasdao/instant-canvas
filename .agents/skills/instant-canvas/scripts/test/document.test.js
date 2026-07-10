@@ -349,9 +349,30 @@ const SNAPSHOT_JS = `
 
 let themeSnap = null
 
+const VIEW_SNAPSHOT_JS = `
+	(() => {
+		const rootEl = document.querySelector('.doc-mode');
+		const deck = document.querySelector('.deck');
+		const html = document.querySelector('.doc-html');
+		const gd = document.querySelector('.js-plotly-plot');
+		return {
+			toggleHidden: document.getElementById('viewToggle').hidden,
+			deckActive: document.getElementById('viewDeck').classList.contains('active'),
+			viewHtmlClass: !!(rootEl && rootEl.classList.contains('view-html')),
+			printing: !!(rootEl && rootEl.classList.contains('printing')),
+			deckDisplay: deck ? getComputedStyle(deck).display : null,
+			htmlDisplay: html ? getComputedStyle(html).display : null,
+			chartHome: gd ? (gd.closest('.doc-html') ? 'html' : gd.closest('.deck') ? 'deck' : 'lost') : 'none',
+			chartDrawn: !!(gd && gd.querySelector('.main-svg')),
+			deckSheets: document.querySelectorAll('.deck .sheet').length,
+			plotCount: document.querySelectorAll('.js-plotly-plot').length,
+		};
+	})()
+`
+
 async function driveThemedCanvas() {
 	const url = `http://127.0.0.1:${K.port}/?token=${encodeURIComponent(K.token)}#/c/${encodeURIComponent('themed.canvas.json')}`
-	return withChrome(CHROME, url, { onNewDocument: PROBE }, async ({ evaluate }) => {
+	return withChrome(CHROME, url, { onNewDocument: PROBE }, async ({ evaluate, send }) => {
 		const deadline = Date.now() + 30_000
 		for (;;) {
 			// Poll for the APP, not just an element: the shell exists before app.js
@@ -369,7 +390,31 @@ async function driveThemedCanvas() {
 		await evaluate(`(() => { document.getElementById('themeBtn').click(); return true })()`)
 		await cdpSleep(1200)
 		const dark = await evaluate(SNAPSHOT_JS)
-		return { light, dark }
+
+		// --- deck ⇄ continuous toggle (charts exist once; reparent, never remount)
+		const atDeck = await evaluate(VIEW_SNAPSHOT_JS)
+		await evaluate(`(() => { document.getElementById('viewHtml').click(); return true })()`)
+		await cdpSleep(500)
+		const atHtml = await evaluate(VIEW_SNAPSHOT_JS)
+		// Cmd+P path from the continuous view: print CSS shows the deck regardless.
+		const pdfFromHtml = await send('Page.printToPDF', {
+			printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false,
+			marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
+		})
+		// beforeprint/afterprint relocation, driven directly (Cmd+P fires these).
+		await evaluate(`(() => { window.dispatchEvent(new Event('beforeprint')); return true })()`)
+		const duringPrint = await evaluate(VIEW_SNAPSHOT_JS)
+		await evaluate(`(() => { window.dispatchEvent(new Event('afterprint')); return true })()`)
+		const afterPrint = await evaluate(VIEW_SNAPSHOT_JS)
+		await evaluate(`(() => { document.getElementById('viewDeck').click(); return true })()`)
+		await cdpSleep(400)
+		const backAtDeck = await evaluate(VIEW_SNAPSHOT_JS)
+
+		return {
+			light, dark,
+			views: { atDeck, atHtml, duringPrint, afterPrint, backAtDeck },
+			pdfFromHtml: Buffer.from(pdfFromHtml.data, 'base64'),
+		}
 	})
 }
 
@@ -394,6 +439,44 @@ test('document theming adds zero CSP violations, zero <style>, zero style="" in 
 	assert.deepEqual(themeSnap.dark.csp, [], 'no violations after retheme')
 	assert.equal(themeSnap.light.styleEls, 0, 'no <style> element reached the document')
 	assert.deepEqual(themeSnap.light.offenders, [], 'no style="" attribute outside chart internals')
+})
+
+// ---------------------------------------------------------------- browser: view toggle + print relocation
+
+test('the view toggle is visible for a document canvas, deck first', { skip: browserSkip, timeout: 120_000 }, () => {
+	const v = themeSnap.views.atDeck
+	assert.equal(v.toggleHidden, false, 'the toggle shows for a document canvas')
+	assert.equal(v.deckActive, true, 'the deck is the default view')
+	assert.notEqual(v.deckDisplay, 'none', 'the deck is on screen')
+	assert.equal(v.htmlDisplay, 'none', 'the continuous view is hidden')
+	assert.equal(v.chartHome, 'deck', 'the chart lives in the deck')
+})
+
+test('toggling to the continuous view reparents the ONE chart — no remount', { skip: browserSkip, timeout: 120_000 }, () => {
+	const v = themeSnap.views.atHtml
+	assert.equal(v.viewHtmlClass, true)
+	assert.equal(v.deckDisplay, 'none', 'the deck hides')
+	assert.notEqual(v.htmlDisplay, 'none', 'the continuous view shows')
+	assert.equal(v.chartHome, 'html', 'the live chart node moved into the continuous view')
+	assert.equal(v.chartDrawn, true, 'it is still the same drawn plot')
+	assert.equal(v.plotCount, 1, 'charts exist ONCE — never duplicated across views')
+	const b = themeSnap.views.backAtDeck
+	assert.equal(b.chartHome, 'deck', 'toggling back moves it home')
+	assert.notEqual(b.deckDisplay, 'none')
+})
+
+test('printing from the continuous view still prints the deck 1:1', { skip: browserSkip, timeout: 120_000 }, () => {
+	assert.equal(pdfPageCount(themeSnap.pdfFromHtml), themeSnap.views.atDeck.deckSheets,
+		'printToPDF from the HTML view yields exactly the deck sheets')
+})
+
+test('beforeprint relocates charts into the deck; afterprint restores them', { skip: browserSkip, timeout: 120_000 }, () => {
+	const d = themeSnap.views.duringPrint
+	assert.equal(d.printing, true, 'the printing class is set')
+	assert.equal(d.chartHome, 'deck', 'the chart moved into the deck for printing')
+	const a = themeSnap.views.afterPrint
+	assert.equal(a.printing, false, 'the printing class is removed')
+	assert.equal(a.chartHome, 'html', 'the chart returned to the continuous view')
 })
 
 // ---------------------------------------------------------------- browser: deck + packer
@@ -557,6 +640,10 @@ test('pdftotext: cover, TOC, body markers and back cover land on their sheets', 
 		assert.match(norm(pdfPageText(file, s.markerOne + 1)), /MARKER-CHAPTER-ONE-BODY/, 'chapter 1 marker on its sheet')
 		assert.match(norm(pdfPageText(file, s.markerTwo + 1)), /MARKER-CHAPTER-TWO-BODY/, 'chapter 2 marker on its sheet')
 		assert.match(norm(pdfPageText(file, s.sheetCount)), /MARKER-BACK-COVER/, 'back cover prints last')
+		// App chrome must not print: no sidebar header, no canvas path header.
+		const all = norm(execFileSync('pdftotext', [file, '-'], { encoding: 'utf8' }))
+		assert.ok(!/WORKSPACE/.test(all), 'the sidebar did not print')
+		assert.ok(!/report\.canvas\.json/.test(all), 'no canvas file path header printed')
 	} finally {
 		fs.rmSync(file, { force: true })
 	}

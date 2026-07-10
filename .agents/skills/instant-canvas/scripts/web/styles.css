@@ -564,6 +564,24 @@ body.modal-open .main{overflow:hidden}
 .doc-mode .deck{padding:8px 0 48px}
 .deck-scale{transform-origin:top center;display:flex;flex-direction:column;gap:28px;align-items:center}
 
+/* deck ⇄ continuous toggle. Always visible while a document canvas is open —
+   never hover-gated (a touch screen has no hover). */
+.view-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto}
+.view-toggle[hidden]{display:none}
+.vt-btn{display:flex;align-items:center;padding:6px 11px;border:none;background:var(--panel);color:var(--muted)}
+.vt-btn+.vt-btn{border-left:1px solid var(--border)}
+.vt-btn:hover{background:var(--panel-2)}
+.vt-btn.active{background:var(--accent-soft);color:var(--accent)}
+.vt-btn .lucide{width:15px;height:15px}
+
+/* one view at a time on screen; print always shows the deck */
+.doc-mode.view-html .deck{display:none}
+.doc-mode:not(.view-html) .doc-html{display:none}
+/* while relocating charts for printing, the deck must LAY OUT (off-screen)
+   so Plots.resize reads real sheet sizes */
+.doc-mode.printing .deck{display:block;position:absolute;left:-100000px;top:0}
+.chart-slot{display:flow-root}
+
 /* Paper is always light: the LIGHT token set is forced here so every block
    rendered inside a sheet ignores the app theme (dark app, white paper).
    Mirrors the :root light block above — keep in step with it. --accent maps
@@ -648,7 +666,9 @@ body.modal-open .main{overflow:hidden}
 	body:has(.deck) .main{overflow:visible;padding:0;margin:0}
 	body:has(.deck) .canvas{padding:0;margin:0}
 	body:has(.deck){background:#fff}
-	.doc-mode .deck{padding:0;height:auto !important}
+	/* the deck prints no matter which view is on screen */
+	.doc-html{display:none !important}
+	.doc-mode .deck{display:block !important;position:static !important;padding:0;height:auto !important}
 	.deck-scale{transform:none !important;display:block}
 	.sheet{box-shadow:none;margin:0}
 	.sheet:not(:last-child){break-after:page;page-break-after:always}

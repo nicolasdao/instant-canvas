@@ -34,6 +34,9 @@ const state = {
 	canvasDoc: null,
 	session: null, // {id, expiresAt} for the active interactive canvas
 	wsAlive: false,
+	docView: 'deck', // document canvases: 'deck' (the default) or 'html'
+	docCanvasId: null, // which canvas docView belongs to — resets on navigation
+	docFit: null, // re-runs the deck scale fit; set by each document render
 }
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -292,6 +295,31 @@ $('themeBtn').addEventListener('click', () => {
 	// never calls loseContext), so repeated toggles would exhaust the browser's
 	// context ceiling. Everything else follows the CSS variables for free.
 	rethemeCharts()
+})
+
+// Document deck ⇄ continuous view. Both live in the DOM (one hidden by the
+// view class); the toggle is a class flip plus a chart relocation.
+$('viewDeck').addEventListener('click', () => switchDocView('deck'))
+$('viewHtml').addEventListener('click', () => switchDocView('html'))
+
+// Cmd+P must print the DECK even from the continuous view: print CSS already
+// shows the deck and hides the rest, so all beforeprint has to do is move the
+// live chart nodes into the deck's slots (cheap, synchronous). The .printing
+// class keeps the deck laid out (off-screen) so Plots.resize sees real sizes.
+window.addEventListener('beforeprint', () => {
+	const rootEl = document.querySelector('.doc-mode')
+	if (!rootEl || state.docView === 'deck')
+		return
+	rootEl.classList.add('printing')
+	moveChartsTo(rootEl, 'deck')
+})
+window.addEventListener('afterprint', () => {
+	const rootEl = document.querySelector('.doc-mode')
+	if (!rootEl)
+		return
+	rootEl.classList.remove('printing')
+	if (state.docView === 'html')
+		moveChartsTo(rootEl, 'html')
 })
 
 // ---------------------------------------------------------------- sidebar
@@ -1446,9 +1474,9 @@ function renderChartShell(block, idx) {
 // The generation counter lets a re-render abandon an in-flight mount loop.
 let mountGeneration = 0
 
-function mountCharts(blocks) {
+function mountCharts(blocks, scope = document) {
 	const generation = ++mountGeneration
-	const boxes = [...document.querySelectorAll('[data-chart]')]
+	const boxes = [...scope.querySelectorAll('[data-chart]')]
 	;(async () => {
 		for (const box of boxes) {
 			if (generation !== mountGeneration || !box.isConnected)
@@ -1661,7 +1689,12 @@ function docFragments(canvas, doc) {
 			if (b.type === 'markdown') {
 				fragments.push(...mdFragments(b, entries, depth))
 			} else if (b.type === 'chart') {
-				fragments.push({ el: htmlFragment(renderChartShell(b, 0), b.title, entries), kind: null, chart: b })
+				// A slot per view; the ONE chart box moves between slots on toggle.
+				const el = htmlFragment(chartSlotShell(b, 0), b.title, entries)
+				const box = document.createElement('div')
+				box.className = 'chart-box' + (TALL_KINDS.has(b.kind) ? ' tall' : '')
+				el.querySelector('.chart-slot').appendChild(box)
+				fragments.push({ el, kind: null, chart: b })
 			} else if (b.type === 'kpi') {
 				fragments.push({ el: htmlFragment(renderKpi(b), null, entries), kind: null })
 			} else if (b.type === 'table') {
@@ -1671,13 +1704,21 @@ function docFragments(canvas, doc) {
 		}
 		flatBlocks.push(...chapter.blocks)
 	})
-	// Chart boxes index into the flattened block list; number them in order.
-	const chartFrags = fragments.filter((f) => f.chart)
-	chartFrags.forEach((f) => {
-		const box = f.el.querySelector('[data-chart]')
-		box.dataset.chart = String(flatBlocks.indexOf(f.chart))
+	// Chart slots and boxes index into the flattened block list.
+	fragments.filter((f) => f.chart).forEach((f) => {
+		const idx = String(flatBlocks.indexOf(f.chart))
+		f.el.querySelector('.chart-slot').dataset.slot = idx
+		f.el.querySelector('.chart-box').dataset.chart = idx
 	})
 	return { fragments, entries, flatBlocks }
+}
+
+/** Chart card with an empty slot — used by both document views. The live plot
+ *  node is appended into whichever view's slot is active. */
+function chartSlotShell(block, idx) {
+	const title = block.title ? `<div class="chart-title">${esc(block.title)}</div>` : ''
+	const desc = block.description ? `<div class="chart-desc">${esc(block.description)}</div>` : ''
+	return `<div class="block card">${title}${desc}<div class="chart-slot" data-slot="${idx}"></div></div>`
 }
 
 // ---- splitting ----
@@ -2016,8 +2057,73 @@ function fitDeck(main, deckEl, scaleEl, geo) {
 	deckEl.style.height = Math.ceil(scaleEl.getBoundingClientRect().height) + 'px'
 }
 
-async function renderDocumentDeck(main, canvas) {
+/** The continuous twin of the deck: the classic canvas layout, with empty
+ *  chart SLOTS — the live plot nodes move in when this view is active. */
+function docHtmlView(canvas, flatBlocks) {
+	const pages = Array.isArray(canvas.pages) ? canvas.pages : [{ name: '', blocks: canvas.blocks || [] }]
+	if (state.activePage >= pages.length) state.activePage = 0
+	const page = pages[state.activePage]
+	const tabs = pages.length > 1 ? `<div class="tabs">${pages.map((p, i) =>
+		`<button class="tab ${i === state.activePage ? 'active' : ''}" data-page="${i}">${esc(p.name)}</button>`).join('')}</div>` : ''
+	const inner = (page.blocks || []).map((b) => {
+		if (!b || typeof b !== 'object') return ''
+		if (b.type === 'markdown') return renderMarkdown(b)
+		if (b.type === 'kpi') return renderKpi(b)
+		if (b.type === 'table') return renderTable(b)
+		if (b.type === 'chart') return chartSlotShell(b, flatBlocks.indexOf(b))
+		return ''
+	}).join('')
+	return `<div class="doc-html"><div class="canvas">
+		<div class="canvas-head"><h1>${esc(canvas.title)}</h1><div class="sub">${esc(state.activeId)}</div></div>
+		${tabs}${inner}
+	</div></div>`
+}
+
+/** Move every chart box into the given view's slots. Charts exist ONCE —
+ *  reparent + Plots.resize, never purge + newPlot (WebGL contexts are never
+ *  released on teardown). A box with no slot in the target view (a chart on
+ *  an inactive tab) stays where it is, hidden. */
+function moveChartsTo(rootEl, view) {
+	const container = rootEl.querySelector(view === 'deck' ? '.deck' : '.doc-html')
+	if (!container)
+		return
+	for (const box of rootEl.querySelectorAll('[data-chart]')) {
+		const slot = container.querySelector(`.chart-slot[data-slot="${box.dataset.chart}"]`)
+		if (!slot || box.parentElement === slot)
+			continue
+		slot.appendChild(box)
+		if (box.classList.contains('js-plotly-plot'))
+			window.Plotly.Plots.resize(box)
+	}
+}
+
+function syncViewToggle() {
+	const isDoc = !!(state.activeId && state.canvasDoc && state.canvasDoc.document && typeof state.canvasDoc.document === 'object')
+	$('viewToggle').hidden = !isDoc
+	$('viewDeck').classList.toggle('active', state.docView === 'deck')
+	$('viewHtml').classList.toggle('active', state.docView !== 'deck')
+}
+
+function switchDocView(view) {
+	if (!state.canvasDoc || !state.canvasDoc.document || view === state.docView)
+		return
+	state.docView = view
+	const rootEl = document.querySelector('.doc-mode')
+	if (rootEl) {
+		rootEl.classList.toggle('view-html', view === 'html')
+		moveChartsTo(rootEl, view)
+		if (view === 'deck' && state.docFit)
+			state.docFit() // the deck may have been hidden when last fitted
+	}
+	syncViewToggle()
+}
+
+async function renderDocumentView(main, canvas) {
 	const doc = canvas.document
+	if (state.docCanvasId !== state.activeId) {
+		state.docCanvasId = state.activeId
+		state.docView = 'deck' // the deck is the default view per canvas
+	}
 	const geo = docGeometry(doc)
 	setPageRule(geo)
 	main.innerHTML = '<div class="canvas doc-mode"><div class="deck"><div class="deck-scale"></div></div></div>'
@@ -2047,8 +2153,13 @@ async function renderDocumentDeck(main, canvas) {
 		scaleEl.appendChild(s)
 	substitutePageVars(scaleEl, sheets.length)
 
-	fitDeck(main, deckEl, scaleEl, geo)
-	const ro = new ResizeObserver(() => fitDeck(main, deckEl, scaleEl, geo))
+	// The continuous twin lives beside the deck; the view class hides one.
+	rootEl.insertAdjacentHTML('beforeend', docHtmlView(canvas, flatBlocks))
+	rootEl.classList.toggle('view-html', state.docView === 'html')
+
+	state.docFit = () => fitDeck(main, deckEl, scaleEl, geo)
+	state.docFit()
+	const ro = new ResizeObserver(() => state.docFit && state.docFit())
 	ro.observe(main)
 	state.observers.push(ro)
 
@@ -2063,7 +2174,10 @@ async function renderDocumentDeck(main, canvas) {
 	})
 
 	mountCodeCopy(main)
-	mountCharts(flatBlocks)
+	mountCharts(flatBlocks, deckEl)
+	if (state.docView === 'html')
+		moveChartsTo(rootEl, 'html')
+	syncViewToggle()
 }
 
 // ---------------------------------------------------------------- canvas view
@@ -2090,16 +2204,20 @@ async function renderCanvas() {
 	disposeCharts()
 	const main = $('main')
 	if (!state.activeId) {
+		state.canvasDoc = null
 		main.innerHTML = renderEmpty()
+		syncViewToggle()
 		return
 	}
 	const { status, json } = await api('/api/canvas?path=' + encodeURIComponent(state.activeId))
 	if (status !== 200 || !json || !json.ok) {
 		const errors = json && json.errors
+		state.canvasDoc = null
 		main.innerHTML = `<div class="canvas">
 			<div class="canvas-head"><h1>${esc(state.activeId)}</h1><div class="sub">${esc(state.activeId)}</div></div>
 			${errors ? renderErrors(state.activeId, errors) : `<div class="placeholder">Could not load this canvas (HTTP ${status}).</div>`}
 		</div>`
+		syncViewToggle()
 		return
 	}
 	const canvas = json.canvas
@@ -2108,7 +2226,7 @@ async function renderCanvas() {
 
 	// Document mode: the deck of paper sheets replaces the continuous view.
 	if (canvas.document && typeof canvas.document === 'object') {
-		await renderDocumentDeck(main, canvas)
+		await renderDocumentView(main, canvas)
 		return
 	}
 
@@ -2138,6 +2256,7 @@ async function renderCanvas() {
 	mountCodeCopy(main)
 	mountCharts(blocks)
 	wireInteractive(blocks)
+	syncViewToggle()
 }
 
 $('main').addEventListener('click', async (e) => {
