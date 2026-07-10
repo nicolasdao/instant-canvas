@@ -105,11 +105,11 @@
         "The markdown block",
         "Chart kinds (26)",
         "Sweeps: a slider over precomputed frames",
-        "Form fields (16 types)",
+        "Document mode",
         "Validator behavior",
         "Catalog: progressive disclosure"
       ],
-      "line_count": 137,
+      "line_count": 161,
       "links_to": [
         "docs/frontend.md",
         "docs/security.md"
@@ -147,12 +147,13 @@
         "Output discipline",
         "Commands",
         "open",
+        "print",
         "stamp",
         "validate / catalog / status / stop",
         "Result contract (stdout of `open`)",
         "The agent workflow"
       ],
-      "line_count": 73,
+      "line_count": 83,
       "links_to": [
         "docs/canvas-schema.md",
         "docs/security.md"
@@ -185,13 +186,14 @@
         "Display renderers",
         "Mounting",
         "Sweeps",
+        "Document mode: the deck and the packer",
         "Bespoke form widgets",
         "Layout",
         "Theming",
         "CSP shim",
         "Icons and vendored assets"
       ],
-      "line_count": 74,
+      "line_count": 84,
       "links_to": [
         "docs/gotchas/frontend.md"
       ],
@@ -273,9 +275,11 @@
         "A hover-revealed control does not exist on a touch screen",
         "Native widget chrome ignores your dark theme",
         "themeRiver needs real dates",
+        "swiftshader blanks gl3d in printed output while the screen looks fine",
+        "A sheet 3 px too tall prints a silent sliver page",
         "Constraint API quirks around custom widgets"
       ],
-      "line_count": 105,
+      "line_count": 113,
       "links_to": [],
       "over_size": false,
       "parse_error": null,
@@ -489,7 +493,7 @@
         "Security regressions",
         "Browser verification"
       ],
-      "line_count": 62,
+      "line_count": 64,
       "links_to": [
         "docs/gotchas/testing.md"
       ],

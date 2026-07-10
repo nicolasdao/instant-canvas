@@ -52,7 +52,7 @@ node scripts/instantcanvas.js open my.canvas.json       # one JSON result on std
 node scripts/instantcanvas.js status
 node scripts/instantcanvas.js stop
 
-# tests (139, zero deps; the browser tests skip without Chrome)
+# tests (176, zero deps; the browser tests skip without Chrome)
 node --test scripts/test/
 ```
 
@@ -66,7 +66,7 @@ node --test scripts/test/
   skill.json                     HappySkills metadata
   examples/                      Four validated example canvases
   scripts/
-    instantcanvas.js             CLI: open | validate | catalog | status | stop
+    instantcanvas.js             CLI: open | print | stamp | validate | catalog | status | stop
     kernel.js                    Per-workspace localhost server (HTTP + hand-rolled WS)
     lib/                         schema/validate/catalog, registry, redact, envfile, …
     web/                         Browser app (no framework) + csp-shim + vendored Plotly/markdown-it/highlight.js

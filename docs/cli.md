@@ -17,6 +17,7 @@ Entry point: `node scripts/instantcanvas.js <command>` from the skill root (`.ag
 
 ```
 open <canvas.json> [--workspace <dir>] [--no-open] [--timeout <s>] [--result <file>]
+print <canvas.json> --out <file.pdf> [--workspace <dir>]
 stamp <canvas.json> [--workspace <dir>] [--retrofit]
 validate <canvas.json>
 catalog [name] [--full]
@@ -32,6 +33,14 @@ stop [--workspace <dir>]
 4. `POST /api/open`, then open the browser (unless `--no-open`; a failed browser launch is a stderr warning `BROWSER_OPEN_FAILED` with the URL, never an error).
 5. **Display canvas** → print `{"status": "opened", "url", ...}`, exit 0 immediately. **Interactive canvas** → block, polling the session every second until the human resolves it. Polling tolerates transient socket blips: fresh connection per request (`agent: false`) and up to 3 consecutive failures cross-checked against the registry health ping before declaring the kernel lost.
 6. `--result <file>` mirrors the stdout JSON to a file. `--timeout <s>` overrides the session expiry (default 600).
+
+### print
+
+Prints a **document canvas** (envelope-level `document` object — anything else is refused with a teaching error) to PDF through a local headless Chrome: validate → ensure kernel → drive Chrome to the canvas URL → wait until the deck is laid out and every chart drew (structure, never "ink") → `Page.printToPDF` with `printBackground` + `preferCSSPageSize` and zero margins → atomic write. The sheets on screen ARE the PDF pages, so the reported `pages` equals the PDF's `/Count` by construction.
+
+- **The only Chrome-dependent command.** Discovery reuses `findChrome`; no Chrome → `CHROME_REQUIRED` (exit 2) naming `CHROME_PATH` as the override. An explicit `CHROME_PATH` pointing at a missing binary is an error, never a silent fallback.
+- Chrome launches `--headless=new --enable-gpu` — **never** the tests' swiftshader profile, which silently blanks 3D charts in printed output. 3D kinds need a working GPU for `print`; Cmd+P from the real browser always works. (Verified on macOS/Apple Silicon; a GPU-less CI box may still print blank 3D.)
+- `--out` resolves through `insideRoot`; outside the workspace → `PATH_OUTSIDE_WORKSPACE` (the CLI has no confirmation handshake — that flow is browser-only).
 
 ### stamp
 
@@ -51,6 +60,7 @@ Two properties are load-bearing. It is **idempotent**: an existing stamp is retu
 | Case | JSON |
 |---|---|
 | display | `{"status":"opened","url","canvas","workspace","timestamp"}` |
+| print | `{"status":"printed","path","pages","bytes","timestamp"}` — `path` workspace-relative, `pages` == the deck's sheet count |
 | form → file | `{"status":"saved","destination":{"kind","path"},"fields":[names],"overwritten":[names],"redacted":true,"timestamp"}` |
 | form, no file destination | `{"status":"submitted","fields":[...],"values":{non-secret only}?,"timestamp"}` |
 | cancelled / expired | `{"status":"cancelled"\|"timeout",...}` — exit 0 |

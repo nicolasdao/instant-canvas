@@ -109,7 +109,31 @@ This is the honest limit of declarative interactivity under the canvas CSP: a sl
 
 Validation: `data` becomes optional (and is warned about if sent anyway); `frames` needs ≥ 2 entries; each frame needs a `label` and non-empty `data`. Encoding keys are checked against `frames[0].data[0]`.
 
-## Form fields (16 types)
+## Document mode
+
+An envelope-level `document` object (`catalog document`) renders the canvas as **paper sheets that print 1:1** — cover, table of contents, running header/footer, chapters (from `pages[]`), back cover, brand theme. Presence of the key enables the mode; every sub-key is optional and presence enables its feature:
+
+```jsonc
+"document": {
+  "cover":     { "title", "subtitle"?, "author"?, "date"?, "logo"? },
+  "toc":       { "title"?: "Contents", "depth"?: 2 },            // depth 1–3
+  "header":    { "left"?, "center"?, "right"? },                 // every content sheet
+  "footer":    { "left"?, "center"?, "right"? },                 // {{pageNumber}}/{{totalPages}} substituted
+  "backCover": { "title"?, "text"?, "logo"? },
+  "theme":     { "accent"?, "palette"? },                        // strict hex only
+  "page":      { "size"?: "A4"|"letter", "orientation"?, "margin"?: "15mm" }
+}
+```
+
+Shapes are registry-driven (`SHAPES.document*` in `schema.js`); `checkDocument` in `validate.js` adds the value rules the registry cannot express:
+
+- **`DOCUMENT_INTERACTIVE_BLOCK`** — a `form` or `confirm` block, or a chart carrying `sweep`, is refused in a document canvas: paper cannot submit or drag. The hints teach the fixes (drop the block / remove `document` / ship the one frame you want as plain `data`).
+- **`INVALID_COLOR`** — theme colors must match `^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`. The values are assigned into live CSS via CSSOM, which was observed accepting the literal string `javascript:alert(1)` — nothing looser than strict hex may pass. The palette holds 1–8 colors.
+- **`UNKNOWN_TEMPLATE_VAR`** (warning) — an unknown `{{var}}` in a header/footer string renders literally; only `{{pageNumber}}` and `{{totalPages}}` are substituted.
+- `page.margin` must be a millimeter length (`^\d+(\.\d+)?mm$`) — sheet geometry is computed in millimeters.
+- `cover.logo`/`backCover.logo` follow the markdown asset ladder: remote URLs are `REMOTE_ASSET_BLOCKED` (same message, same hint), the extension must be in `IMAGE_MIME`, `insideRoot` confines the path, existence is checked when the root is known; a `data:image/` URI passes through as-is. The kernel inlines logo files as `data:` URIs (`resolveDocumentAssets`, sharing `inlineImageFile` with markdown image inlining) and drops a logo it cannot inline rather than serving a broken image.
+
+**The TOC never shows page numbers, by design.** The `print` command is deterministic (the skill sets the paper), but Cmd+P never is — the human can pick Letter or 90 % scale in the dialog, silently repaginating. A number the dialog can falsify is a number the TOC must not print; entries with dotted leaders are honest in both paths.
 
 `text textarea secret email url tel number date datetime select radio checkbox checkboxGroup range hidden readonly`
 
@@ -124,7 +148,7 @@ Common shape: `{name, label, type, required?, placeholder?, help?, default?, opt
 
 `validate(source, {root})` collects **all** errors in one pass — never fail-fast, never throws for spec problems. Every error carries `code`, `path` (e.g. `pages[1].blocks[0].encoding.y[1]`), `message`, and usually `got`, `expected`, a Levenshtein/alias-driven `hint` ("Did you mean \"range\"?"), and a correct `example`. Unknown properties are **warnings**, not errors. `INVALID_JSON` includes line/column. This is the deterministic half of the agentic loop: the agent writes, the validator names the exact defect and its fix, the agent retries until `{"ok": true}`.
 
-Error codes: `INVALID_JSON, INVALID_SPEC, UNSUPPORTED_VERSION, MISSING_CREATED_WITH(warn in the kernel), INVALID_CREATED_WITH(warn in the kernel), UNKNOWN_BLOCK_TYPE, UNKNOWN_FIELD_TYPE, UNKNOWN_PROPERTY(warn), MISSING_REQUIRED_PROPERTY, INVALID_PROPERTY_TYPE, INVALID_ENUM_VALUE, DUPLICATE_FIELD_NAME, MULTIPLE_INTERACTIVE_BLOCKS, ENCODING_KEY_NOT_IN_DATA, INVALID_ENV_KEY, PATH_OUTSIDE_WORKSPACE, MISSING_SOURCE, REMOTE_ASSET_BLOCKED, MDX_NOT_RENDERED(warn), RAW_HTML_NOT_RENDERED(warn)` — plus runtime codes surfaced by the CLI/kernel: `SECRET_RETURN_BLOCKED, WRITE_FAILED, SESSION_TIMEOUT, KERNEL_UNREACHABLE, BROWSER_OPEN_FAILED(warn), INTERNAL_ERROR`.
+Error codes: `INVALID_JSON, INVALID_SPEC, UNSUPPORTED_VERSION, MISSING_CREATED_WITH(warn in the kernel), INVALID_CREATED_WITH(warn in the kernel), UNKNOWN_BLOCK_TYPE, UNKNOWN_FIELD_TYPE, UNKNOWN_PROPERTY(warn), MISSING_REQUIRED_PROPERTY, INVALID_PROPERTY_TYPE, INVALID_ENUM_VALUE, DUPLICATE_FIELD_NAME, MULTIPLE_INTERACTIVE_BLOCKS, DOCUMENT_INTERACTIVE_BLOCK, INVALID_COLOR, UNKNOWN_TEMPLATE_VAR(warn), ENCODING_KEY_NOT_IN_DATA, INVALID_ENV_KEY, PATH_OUTSIDE_WORKSPACE, MISSING_SOURCE, REMOTE_ASSET_BLOCKED, MDX_NOT_RENDERED(warn), RAW_HTML_NOT_RENDERED(warn)` — plus runtime codes surfaced by the CLI/kernel: `SECRET_RETURN_BLOCKED, WRITE_FAILED, SESSION_TIMEOUT, KERNEL_UNREACHABLE, CHROME_REQUIRED, BROWSER_OPEN_FAILED(warn), INTERNAL_ERROR`.
 
 ## Catalog: progressive disclosure
 

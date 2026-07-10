@@ -14,7 +14,7 @@ cd .agents/skills/instant-canvas
 node --test scripts/test/
 ```
 
-139 tests at last count, twenty-three of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
+176 tests at last count, forty-three of which drive a real browser (or headless printing) and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
 
 ## Suite layout
 
@@ -33,6 +33,8 @@ node --test scripts/test/
 | `forms.test.js` | Blocking `open` + HTTP submit: `.env` round-trip with redaction sweep, overwrite/outside-root 409 handshakes, confirm/timeout/cancel, json destinations, url-protocol and patternMessage rules. |
 | `hardening.test.js` | Source scans (loopback literal, no third-party requires, timing-safe compare, no CORS, no `console.log` server-side) and runtime error codes (`WRITE_FAILED`, `SESSION_TIMEOUT`, `KERNEL_UNREACHABLE`). |
 | `render.test.js` | Real headless Chrome via `helpers/cdp.js`: an adversarial canvas (splom + violin + 3D + skill-rendered kinds + a sweep + a markdown document) must draw every chart, expose a slider, highlight fenced code, inline a local PNG **and SVG** as `data:` URIs, show an always-visible copy button that survives a real clipboard round-trip, carry **no** `style=""` attribute, and log zero CSP violations. Skips without Chrome. |
+| `document.test.js` | Document mode end to end. Contract: the `document` envelope shapes, interactive/sweep refusal, strict-hex colors, template-var warnings, the logo asset ladder; a spawned kernel inlining logos as `data:` URIs. Browser (skips without Chrome): brand tokens via CSSOM + the Plotly palette sink, the deck (cover/TOC/chapters/back cover), the sheet-height invariant on every sheet, code-split reconstruction with highlighting intact, `printToPDF` `/Count` == sheet count for three fixtures, per-page `pdftotext` markers, the deck⇄continuous toggle reparenting the one live chart, `beforeprint` relocation. |
+| `print.test.js` | The `print` command: result JSON shape, `/Count` == reported pages, the token/`127.0.0.1` leak regression on the PDF bytes, `CHROME_REQUIRED` on a bad `CHROME_PATH`, `--out` workspace confinement, the non-document refusal. Never asserts gl3d ink (a GPU-less machine prints blank 3D while everything else passes). |
 | `browse.test.js` | Real headless Chrome: the folder-browser modal must list, select without re-listing, and descend by chevron, double-click, and breadcrumb. Skips without Chrome. |
 | `search.test.js` | Real headless Chrome: the search modal must open without fetching, match on name and folder, survive `c++` and `<script>` queries, never mark inside an entity, and wire ⌘K / `/` / arrows / Esc correctly. Skips without Chrome. |
 

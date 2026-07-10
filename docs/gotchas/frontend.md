@@ -100,6 +100,14 @@ Number-input spinners, scrollbars, and picker internals render for the *browser'
 
 Its axis is time-typed (`xaxis.type: 'date'`): category-style x values like `"W1"` silently fail to plot. Use parseable date strings (`"2026-07-01"`). The schema example and docs say so — keep them that way.
 
+## swiftshader blanks gl3d in printed output while the screen looks fine
+
+Chrome's software GL (`--disable-gpu --use-angle=swiftshader` — the profile the browser tests launch with) draws `scatter3d`/`surface` correctly **on screen** and silently produces **blank panels in `printToPDF` output** on the very same page. regl kinds (`splom`, `parallel`) print fine everywhere. Worse, the failure is unassertable by "ink": a mean-gray metric measured 0.9823 blank vs 0.9829 drawn, and a blank `surface` still prints its colorbar. Consequences, all load-bearing: the `print` command launches `--headless=new --enable-gpu` and must never gain the swiftshader flags; the test helper keeps them (on-screen WebGL needs them) and must never be "reused" for printing; and no test may assert gl3d ink in a PDF — a print test on the wrong flags passes green with every 3D chart blank.
+
+## A sheet 3 px too tall prints a silent sliver page
+
+Document-mode pagination is by construction: each `.sheet` is exactly one printed page, so the whole feature hangs on `sheet.scrollHeight <= clientHeight`. The negative control proves the stakes: one sheet at `calc(297mm + 3px)` turns a 6-page deck into 7 pages — no error, no warning, just a blank sliver in the PDF. Three rules keep it airtight: sheets clip (`overflow: hidden`), so overfilled *content* degrades visibly instead of repaginating; measurement happens in an **auto-height** replica (a fixed box's `scrollHeight` is clamped to its `clientHeight` and would always "fit") with `flow-root` bodies so edge margins cannot escape; and the browser test asserts the invariant directly on every sheet AND `/Count` equality in the printed PDF — the DOM check catches overflow, the PDF check catches box-geometry drift, and neither alone catches both.
+
 ## Constraint API quirks around custom widgets
 
 `required` does not fire on readonly inputs, and hidden inputs are excluded from validation entirely. Hence: the custom select's display input is *typing-suppressed but not readonly* (so `required` works), while segmented buttons and pills run a manual required pre-check that writes into the inline error slots before `checkValidity()` runs.
