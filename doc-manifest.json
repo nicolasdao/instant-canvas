@@ -250,6 +250,7 @@
       "headings": [
         "Gotchas — Frontend",
         "CSP silently drops `style=\"\"` attributes",
+        "markdown-it silently refuses most `data:` image URIs",
         "Shiki cannot be used for syntax highlighting, and it is not about size",
         "Plotly injects a `<style>` element unless you claim its id",
         "Plotly cannot read CSS variables",
@@ -270,7 +271,7 @@
         "themeRiver needs real dates",
         "Constraint API quirks around custom widgets"
       ],
-      "line_count": 99,
+      "line_count": 105,
       "links_to": [],
       "over_size": false,
       "parse_error": null,

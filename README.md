@@ -51,7 +51,7 @@ node scripts/instantcanvas.js open my.canvas.json       # one JSON result on std
 node scripts/instantcanvas.js status
 node scripts/instantcanvas.js stop
 
-# tests (121, zero deps; the browser tests skip without Chrome)
+# tests (122, zero deps; the browser tests skip without Chrome)
 node --test scripts/test/
 ```
 

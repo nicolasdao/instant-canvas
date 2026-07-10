@@ -18,6 +18,12 @@ source:
 
 **markdown-it trips it too, and nobody noticed for months.** A `|---:|` column alignment renders as `<th style="text-align:right">`, so every aligned markdown table silently lost its alignment *and* logged a CSP violation. The fix is a `core.ruler` rule that rewrites the `style` attribute into a `.ta-right` class before the token reaches the DOM. The lesson generalizes: **any third-party HTML generator is a CSP suspect**, because the failure mode is silence. Assert `document.querySelectorAll('.md [style]').length === 0` in the browser test, not just "it looked fine."
 
+## markdown-it silently refuses most `data:` image URIs
+
+Its default `validateLink` allows only `data:image/png|jpeg|gif|webp`. Everything else — **SVG**, AVIF, BMP, ICO — is dropped and the image renders as the literal text `![alt](data:…)`. No `<img>`, no error, no CSP violation. The kernel was inlining SVG correctly the whole time and markdown-it was throwing it away downstream, so an SVG diagram (the common case for a README) never appeared. `app.js` overrides `validateLink` to accept exactly the base64 image types the kernel emits; `javascript:`, `vbscript:` and `file:` stay refused by the default. An SVG inside `<img>` runs no script and fetches nothing, and `default-src 'none'` holds regardless.
+
+Two lessons. **A third-party sanitizer will silently discard output you know is correct** — when a pipeline stage looks right and the next stage shows nothing, suspect the sanitizer between them. And **test the format you actually ship**: the unit test passed because it used a PNG, which is the one family markdown-it never questions. `render.test.js` now inlines a PNG *and* an SVG.
+
 ## Shiki cannot be used for syntax highlighting, and it is not about size
 
 Shiki produces beautiful output by writing an inline `style=` on **every token**. Under `style-src 'self'` every one of those is dropped, so the code renders as unstyled monospace with nothing in the console explaining why. **highlight.js emits class names**, which is the only reason it works here. The theme therefore lives in `styles.css` behind `--code-*` tokens — never a vendored hljs stylesheet, and never an injected `<style>` element, which `render.test.js` asserts is always zero. When evaluating any future rendering library, the first question is *classes or inline styles*, not bundle size.
