@@ -1,1 +1,77 @@
+# ─── Secrets and captured input ────────────────────────────────────────────
+# InstantCanvas's whole point is writing user input straight to disk. Running
+# the shipped examples/demos from this repo drops these files into the
+# workspace root. They hold real credentials, not fixtures — never commit them.
+.env
+.env.*
+!.env.example
 profile.json
+deploy.config.json
+*.pem
+*.key
+
+# Form/confirm results written by the demos/ canvases
+demos/*.output.json
+
+# ─── Dependencies and build artifacts ──────────────────────────────────────
+# The skill ships zero dependencies, but rebuilding the vendored Plotly bundle
+# (scripts/web/vendor/VENDORED.md) needs a throwaway npm install.
+node_modules/
+dist/
+build/
+*.tgz
+
+# ─── Logs and diagnostics ──────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+coverage/
+.nyc_output/
+
+# ─── Temporary and scratch ─────────────────────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ─── Editors and IDEs ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Machine-local Claude Code settings (the tracked .claude/skills/ stay)
+.claude/settings.local.json
+
+# ─── macOS ─────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.DocumentRevisions-V100
+.TemporaryItems
+.Trashes
+.fseventsd
+.VolumeIcon.icns
+Icon?
+
+# ─── Windows ───────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ─── Linux ─────────────────────────────────────────────────────────────────
+.directory
+.Trash-*
+.nfs*
