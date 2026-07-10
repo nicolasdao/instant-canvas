@@ -68,13 +68,20 @@ test('stripFrontmatter removes a leading YAML block and nothing else', () => {
 	assert.equal(stripFrontmatter('no frontmatter'), 'no frontmatter')
 })
 
-test('readMarkdownSrc strips frontmatter for .mdx, and leaves .md alone', () => {
+test('readMarkdownSrc strips frontmatter for every markdown extension', () => {
 	const root = workspace()
+	// A Jekyll/Hugo/Obsidian .md carries frontmatter too; rendered as plain markdown
+	// it becomes a rule plus a setext heading of the raw keys.
 	const doc = '---\ntitle: Report\n---\n# Body\n'
-	fs.writeFileSync(path.join(root, 'a.mdx'), doc)
-	fs.writeFileSync(path.join(root, 'a.md'), doc)
-	assert.equal(readMarkdownSrc(root, 'a.mdx', MAX), '# Body\n', 'MDX frontmatter is not prose')
-	assert.equal(readMarkdownSrc(root, 'a.md', MAX), doc, 'a .md file is passed through verbatim')
+	for (const name of ['a.mdx', 'a.md', 'a.markdown']) {
+		fs.writeFileSync(path.join(root, name), doc)
+		assert.equal(readMarkdownSrc(root, name, MAX), '# Body\n', `${name}: frontmatter is metadata, not prose`)
+	}
+
+	// A document that merely CONTAINS a thematic break keeps it.
+	const rule = '# Hi\n\n---\n\nrule above\n'
+	fs.writeFileSync(path.join(root, 'rule.md'), rule)
+	assert.equal(readMarkdownSrc(root, 'rule.md', MAX), rule)
 })
 
 test('inlineLocalImages turns a workspace image into a data: URI', () => {

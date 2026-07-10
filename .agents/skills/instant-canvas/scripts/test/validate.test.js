@@ -215,6 +215,11 @@ test('the source scan reads prose, not the code it quotes', () => {
 test('an .mdx src is read as markdown, with its frontmatter stripped', () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ic-mdx-'))
 	fs.writeFileSync(path.join(root, 'doc.mdx'), '---\ntitle: Report\n---\n\n# Body\n\n<Chart />\n')
+	fs.writeFileSync(path.join(root, 'doc.md'), '---\ntitle: Report\n---\n\n# Body\n\n<Chart />\n')
+	// Frontmatter is stripped for .md too, so both report the same line.
+	const plain = validate(canvas([{ type: 'markdown', src: 'doc.md' }]), { root })
+	assert.match(plain.warnings[0].message, /line 4/, '.md frontmatter is stripped before scanning')
+
 	const r = validate(canvas([{ type: 'markdown', src: 'doc.mdx' }]), { root })
 	assert.equal(r.ok, true, 'the prose renders; the JSX only warns')
 	assert.deepEqual(warns(r), ['MDX_NOT_RENDERED'])

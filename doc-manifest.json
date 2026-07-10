@@ -107,7 +107,7 @@
         "Validator behavior",
         "Catalog: progressive disclosure"
       ],
-      "line_count": 119,
+      "line_count": 121,
       "links_to": [
         "docs/frontend.md",
         "docs/security.md"

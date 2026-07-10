@@ -14,13 +14,17 @@ function hasMarkdownExtension(src) {
 	return MARKDOWN_EXTENSIONS.includes(path.extname(String(src)).toLowerCase())
 }
 
-const isMdx = (src) => path.extname(String(src)).toLowerCase() === '.mdx'
-
 /**
- * Drop a leading `---` … `---` YAML block. MDX carries frontmatter that a
- * markdown renderer would otherwise draw as a horizontal rule followed by the
- * raw metadata. We do not parse it: the runtime never evaluates MDX, it only
- * renders the static prose underneath.
+ * Drop a leading `---` … `---` YAML block, for every markdown extension.
+ *
+ * Frontmatter is metadata, never prose. Rendered as plain markdown it becomes a
+ * horizontal rule followed by a setext heading made of the raw keys, which is
+ * what a `.md` file out of Jekyll, Hugo or Obsidian used to look like here. We
+ * do not parse it: the runtime never evaluates anything, it renders the static
+ * prose underneath.
+ *
+ * Only fires when the text OPENS with `---` and a closing `---` follows, so a
+ * document containing a thematic break (`# Hi\n\n---\n`) is untouched.
  */
 function stripFrontmatter(text) {
 	const m = /^---[ \t]*\r?\n/.exec(text)
@@ -71,8 +75,7 @@ function readMarkdownSrc(root, src, maxBytes = MAX_MARKDOWN_BYTES) {
 	if (!stat.isFile() || stat.size > maxBytes)
 		return UNAVAILABLE
 	try {
-		const text = fs.readFileSync(abs, 'utf8')
-		return isMdx(src) ? stripFrontmatter(text) : text
+		return stripFrontmatter(fs.readFileSync(abs, 'utf8'))
 	} catch {
 		return UNAVAILABLE
 	}
@@ -192,7 +195,6 @@ module.exports = {
 	MAX_MARKDOWN_BYTES,
 	IMAGE_MIME,
 	hasMarkdownExtension,
-	isMdx,
 	stripFrontmatter,
 	readMarkdownText,
 	readMarkdownSrc,

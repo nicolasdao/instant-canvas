@@ -493,7 +493,7 @@ SHAPES.field.properties.type.enum = Object.keys(FIELD_TYPES)
 const BLOCKS = {
 	markdown: {
 		kind: 'display',
-		description: 'Markdown rendered as a document (raw HTML disabled). Exactly one of "text" (inline) or "src" (a workspace-confined .md, .mdx or .markdown file). Fenced code is syntax-highlighted. An .mdx file renders as static markdown: frontmatter is stripped, JSX and imports are ignored with a warning.',
+		description: 'Markdown rendered as a document (raw HTML disabled). Exactly one of "text" (inline) or "src" (a workspace-confined .md, .mdx or .markdown file). Fenced code is syntax-highlighted, and leading YAML frontmatter is stripped. An .mdx file renders as static markdown: its JSX and imports are never evaluated, and warn.',
 		aliases: ['md', 'text'],
 		notes: [
 			'Remote assets are never fetched — the canvas cannot reach off-origin, by design. Download the asset yourself, then reference a local form.',

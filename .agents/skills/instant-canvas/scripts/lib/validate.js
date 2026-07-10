@@ -5,7 +5,7 @@ const path = require('node:path')
 const { ENVELOPE, BLOCKS, FIELD_TYPES, CHART_KINDS, UNSUPPORTED_CHARTS, SHAPES, ENV_KEY_RE, VERSION } = require('./schema')
 const { SKILL_VERSION, CREATED_WITH_RE } = require('./skillmeta')
 const { insideRoot } = require('./paths')
-const { MARKDOWN_EXTENSIONS, hasMarkdownExtension, isMdx, stripFrontmatter, readMarkdownText, scanMarkdownSource } = require('./markdownsrc')
+const { MARKDOWN_EXTENSIONS, hasMarkdownExtension, stripFrontmatter, readMarkdownText, scanMarkdownSource } = require('./markdownsrc')
 
 // ---------------------------------------------------------------- helpers
 
@@ -284,8 +284,9 @@ function checkMarkdown(block, base, ctx) {
 		checkMarkdownContent(block.text, `${base}.text`, ctx)
 	else if (typeof block.src === 'string' && ctx.root) {
 		const text = readMarkdownText(ctx.root, block.src)
+		// Strip before scanning, so reported line numbers match what the reader sees.
 		if (text !== null)
-			checkMarkdownContent(isMdx(block.src) ? stripFrontmatter(text) : text, `${base}.src`, ctx)
+			checkMarkdownContent(stripFrontmatter(text), `${base}.src`, ctx)
 	}
 }
 
