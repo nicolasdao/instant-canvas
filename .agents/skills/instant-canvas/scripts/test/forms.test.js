@@ -16,6 +16,7 @@ const CLI = path.join(__dirname, '..', 'instantcanvas.js')
 const FIXTURES = path.join(__dirname, 'fixtures')
 process.env.INSTANTCANVAS_STATE_DIR = process.env.INSTANTCANVAS_STATE_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'ic-formstate-'))
 const registry = require('../lib/registry')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 const SECRET_1 = 'sk-test123456789012345678'
 const SECRET_2 = 'sb-secret-VALUE-99-xyzzy'
@@ -150,6 +151,7 @@ test('confirm canvas: confirmed:true/false round-trips; timeout returns clean st
 	const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ic-conf-')))
 	fs.writeFileSync(path.join(root, 'confirm.canvas.json'), JSON.stringify({
 		instantcanvas: 1,
+		createdWith: SKILL_VERSION,
 		title: 'Reset local database',
 		blocks: [{
 			type: 'confirm',
@@ -189,7 +191,7 @@ test('confirm canvas: confirmed:true/false round-trips; timeout returns clean st
 
 test('destinations: json merge, kind none with includeValues (secrets always excluded), outside-root confirm', async () => {
 	const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ic-dest-')))
-	const mkCanvas = (name, block) => fs.writeFileSync(path.join(root, name), JSON.stringify({ instantcanvas: 1, title: name, blocks: [block] }))
+	const mkCanvas = (name, block) => fs.writeFileSync(path.join(root, name), JSON.stringify({ instantcanvas: 1, createdWith: SKILL_VERSION, title: name, blocks: [block] }))
 
 	// fields grouped in a fieldset: the kernel must flatten before validating/writing
 	mkCanvas('json-form.canvas.json', {

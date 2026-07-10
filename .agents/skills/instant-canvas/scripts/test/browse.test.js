@@ -23,6 +23,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { withChrome, findChrome, sleep } = require('./helpers/cdp')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 process.env.INSTANTCANVAS_STATE_DIR = process.env.INSTANTCANVAS_STATE_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'ic-state-'))
 
@@ -30,7 +31,7 @@ const CLI = path.join(__dirname, '..', 'instantcanvas.js')
 const CHROME = findChrome()
 const skip = CHROME ? false : 'Chrome not found — set CHROME_PATH to run the folder-browser test'
 
-const CANVAS = { instantcanvas: 1, title: 'browse fixture', blocks: [{ type: 'markdown', text: 'hi' }] }
+const CANVAS = { instantcanvas: 1, createdWith: SKILL_VERSION, title: 'browse fixture', blocks: [{ type: 'markdown', text: 'hi' }] }
 
 const PROBE = `
 	window.__csp = [];

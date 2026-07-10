@@ -6,10 +6,11 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { validate, renderHuman } = require('../lib/validate')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8')
 const codes = (r) => r.errors.map((e) => e.code)
-const canvas = (blocks) => ({ instantcanvas: 1, title: 'T', blocks })
+const canvas = (blocks) => ({ instantcanvas: 1, createdWith: SKILL_VERSION, title: 'T', blocks })
 
 test('valid display fixture passes with a canvas summary', () => {
 	const r = validate(fixture('valid-display.canvas.json'))
@@ -67,7 +68,7 @@ test('missing marker and title → MISSING_REQUIRED_PROPERTY', () => {
 })
 
 test('INVALID_SPEC: both blocks and pages / non-object canvas', () => {
-	const both = validate({ instantcanvas: 1, title: 'x', blocks: [], pages: [] })
+	const both = validate({ instantcanvas: 1, createdWith: SKILL_VERSION, title: 'x', blocks: [], pages: [] })
 	assert.ok(codes(both).includes('INVALID_SPEC'))
 	const arr = validate('[1,2]')
 	assert.ok(codes(arr).includes('INVALID_SPEC'))
@@ -242,7 +243,7 @@ test('form destination requires path for env/json', () => {
 })
 
 test('unknown properties are warnings, not errors, with hints', () => {
-	const r = validate({ instantcanvas: 1, title: 'x', descriptoin: 'typo', blocks: [] })
+	const r = validate({ instantcanvas: 1, createdWith: SKILL_VERSION, title: 'x', descriptoin: 'typo', blocks: [] })
 	assert.equal(r.ok, true)
 	const w = r.warnings.find((x) => x.code === 'UNKNOWN_PROPERTY')
 	assert.match(w.hint, /Did you mean "description"/)

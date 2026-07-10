@@ -3,6 +3,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { ENVELOPE, BLOCKS, FIELD_TYPES, CHART_KINDS, UNSUPPORTED_CHARTS, SHAPES, ENV_KEY_RE, VERSION } = require('./schema')
+const { SKILL_VERSION, CREATED_WITH_RE } = require('./skillmeta')
 const { insideRoot } = require('./paths')
 const { MARKDOWN_EXTENSIONS, hasMarkdownExtension } = require('./markdownsrc')
 
@@ -538,6 +539,43 @@ function isInteractiveBlock(b) {
  * Collects ALL errors in one pass; never throws for spec problems.
  * Returns {ok, errorCount, errors, warnings} (+ canvas summary when ok).
  */
+/**
+ * The provenance stamp is the one property no agent may author: it must come
+ * from `stamp`, which reads the running skill's version. Validating it here
+ * (rather than through the generic walker) buys an error that names its own fix.
+ *
+ * Only presence and shape are checked — never equality with the running
+ * version. A canvas born under 0.3.0 keeps that stamp forever, which is the
+ * whole point; demanding a match would make every older canvas unopenable and
+ * destroy the migration signal it exists to carry.
+ */
+function checkCreatedWith(canvas, ctx) {
+	const value = canvas.createdWith
+	if (value === undefined) {
+		ctx.error('MISSING_CREATED_WITH', 'createdWith',
+			'This canvas carries no "createdWith" provenance stamp, so a future release could not migrate it.', {
+				expected: 'string — the skill version that created this canvas',
+				hint: 'Do not write this by hand: run `node scripts/instantcanvas.js stamp <canvas.json>` and the skill will fill it in. Use --retrofit for a canvas created before stamping existed.',
+				example: { createdWith: SKILL_VERSION },
+			})
+		return
+	}
+	if (typeOf(value) !== 'string') {
+		ctx.error('INVALID_CREATED_WITH', 'createdWith', `"createdWith" must be of type string, got ${typeOf(value)}.`, {
+			got: typeOf(value),
+			expected: 'string',
+			hint: 'Run `node scripts/instantcanvas.js stamp <canvas.json>` rather than editing the stamp.',
+		})
+		return
+	}
+	if (!CREATED_WITH_RE.test(value))
+		ctx.error('INVALID_CREATED_WITH', 'createdWith', `${JSON.stringify(value)} is not a valid provenance stamp.`, {
+			got: value,
+			expected: 'a semver version (e.g. "0.3.0") or "unknown"',
+			hint: 'Run `node scripts/instantcanvas.js stamp <canvas.json>` rather than editing the stamp.',
+		})
+}
+
 function validate(source, opts = {}) {
 	const ctx = new Ctx(opts)
 	let canvas = source
@@ -570,7 +608,9 @@ function validate(source, opts = {}) {
 		return finish(ctx, canvas)
 	}
 
-	checkObject(canvas, ENVELOPE.properties, '', ctx, { skip: ['blocks', 'pages'] })
+	checkCreatedWith(canvas, ctx)
+
+	checkObject(canvas, ENVELOPE.properties, '', ctx, { skip: ['blocks', 'pages', 'createdWith'] })
 
 	const hasBlocks = canvas.blocks !== undefined, hasPages = canvas.pages !== undefined
 	if (hasBlocks && hasPages)

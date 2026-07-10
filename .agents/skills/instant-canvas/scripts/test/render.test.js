@@ -24,6 +24,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { withChrome, findChrome, sleep } = require('./helpers/cdp')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 process.env.INSTANTCANVAS_STATE_DIR = process.env.INSTANTCANVAS_STATE_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'ic-state-'))
 
@@ -43,6 +44,7 @@ const DOC = [
 
 const CANVAS = {
 	instantcanvas: 1,
+	createdWith: SKILL_VERSION,
 	title: 'render smoke',
 	blocks: [
 		{ type: 'markdown', text: DOC },

@@ -6,6 +6,8 @@
 // Property spec keys: type (string | array of strings for unions), required,
 // enum, default, itemShape (name of a SHAPES entry), description, example.
 
+const { SKILL_VERSION } = require('./skillmeta')
+
 const VERSION = 1
 
 const SHAPES = {
@@ -588,9 +590,15 @@ const BLOCKS = {
 BLOCKS.chart.properties.kind.enum = Object.keys(CHART_KINDS)
 
 const ENVELOPE = {
-	description: 'A canvas file: one renderable document. Top level must carry "instantcanvas": 1 (the marker doubles as the discriminator during workspace scans). EXACTLY ONE of "blocks" or "pages".',
+	description: 'A canvas file: one renderable document. Top level must carry "instantcanvas": 1 (the marker doubles as the discriminator during workspace scans) and "createdWith" (written by `stamp`, never by hand). EXACTLY ONE of "blocks" or "pages".',
 	properties: {
 		instantcanvas: { type: 'number', required: true, enum: [VERSION], description: 'Contract version marker. Must be 1.', example: 1 },
+		createdWith: {
+			type: 'string',
+			required: true,
+			description: 'The InstantCanvas skill version that created this canvas. Set by `instantcanvas stamp`, which reads it from the running skill — do NOT write it by hand. It records the canvas\'s birth version so a future release can migrate it, and is never rewritten once present.',
+			example: SKILL_VERSION,
+		},
 		title: { type: 'string', required: true, description: 'Canvas title (shown as the page heading and in the sidebar).', example: 'Q3 Campaign Analysis' },
 		description: { type: 'string', description: 'Optional subtitle.' },
 		blocks: { type: 'array', itemShape: 'block', description: 'Ordered blocks (single-page canvas). XOR with "pages".' },
@@ -598,6 +606,7 @@ const ENVELOPE = {
 	},
 	example: {
 		instantcanvas: 1,
+		createdWith: SKILL_VERSION,
 		title: 'Q3 Report',
 		blocks: [{ type: 'markdown', text: '## Summary' }, BLOCKS.chart.example],
 	},

@@ -15,6 +15,7 @@ const CLI = path.join(SCRIPTS, 'instantcanvas.js')
 const KERNEL = path.join(SCRIPTS, 'kernel.js')
 process.env.INSTANTCANVAS_STATE_DIR = process.env.INSTANTCANVAS_STATE_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'ic-hardstate-'))
 const registry = require('../lib/registry')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -94,6 +95,7 @@ test('hardening: WRITE_FAILED, SESSION_TIMEOUT, INTERNAL_ERROR, and cross-worksp
 	const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ic-hard-')))
 	fs.writeFileSync(path.join(root, 'locked.canvas.json'), JSON.stringify({
 		instantcanvas: 1,
+		createdWith: SKILL_VERSION,
 		title: 'locked',
 		blocks: [{
 			type: 'form',

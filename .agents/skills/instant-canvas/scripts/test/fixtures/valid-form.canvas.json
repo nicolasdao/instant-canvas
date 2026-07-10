@@ -1,5 +1,6 @@
 {
 	"instantcanvas": 1,
+  "createdWith": "0.1.0",
 	"title": "Valid form fixture",
 	"blocks": [
 		{ "type": "markdown", "text": "## Connect your services" },

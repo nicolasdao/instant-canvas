@@ -5,6 +5,7 @@ const assert = require('node:assert/strict')
 const { catalog } = require('../lib/catalog')
 const schema = require('../lib/schema')
 const { validate } = require('../lib/validate')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 test('bare catalog is the LEAN index: one-liners for everything, no schemas (progressive disclosure)', () => {
 	const lean = catalog()
@@ -45,7 +46,7 @@ test('catalog(name) returns exactly one schema: block, chart kind, field type, f
 	assert.equal(sankey.chartKind, 'sankey')
 	assert.ok(sankey.whenToUse)
 	assert.ok(sankey.encoding.source.required)
-	assert.equal(validate({ instantcanvas: 1, title: 'x', blocks: [sankey.example] }).ok, true, 'kind example is valid')
+	assert.equal(validate({ instantcanvas: 1, createdWith: SKILL_VERSION, title: 'x', blocks: [sankey.example] }).ok, true, 'kind example is valid')
 
 	const secret = catalog('secret')
 	assert.equal(secret.fieldType, 'secret')
@@ -60,7 +61,7 @@ test('catalog(name) returns exactly one schema: block, chart kind, field type, f
 
 test('every chart kind example validates cleanly (registry cannot drift from validator)', () => {
 	for (const [name, def] of Object.entries(schema.CHART_KINDS)) {
-		const res = validate({ instantcanvas: 1, title: 'ex', blocks: [def.example] })
+		const res = validate({ instantcanvas: 1, createdWith: SKILL_VERSION, title: 'ex', blocks: [def.example] })
 		assert.equal(res.ok, true, `${name} example validates: ${JSON.stringify(res.errors)}`)
 		assert.deepEqual(res.warnings, [], `${name} example has no warnings: ${JSON.stringify(res.warnings)}`)
 	}
@@ -69,7 +70,7 @@ test('every chart kind example validates cleanly (registry cannot drift from val
 test('registry is the single source of truth: one schema tweak changes validator AND catalog', () => {
 	const kindSpec = schema.BLOCKS.chart.properties.kind.enum
 	const block = { type: 'chart', kind: 'sparkline', data: [{ a: 1, b: 2 }], encoding: { x: 'a', y: 'b' } }
-	const doc = { instantcanvas: 1, title: 'x', blocks: [block] }
+	const doc = { instantcanvas: 1, createdWith: SKILL_VERSION, title: 'x', blocks: [block] }
 	assert.equal(validate(doc).ok, false, 'sparkline rejected before the tweak')
 	assert.equal(catalog('chart').properties.kind.enum.includes('sparkline'), false)
 	kindSpec.push('sparkline')
@@ -86,7 +87,7 @@ test('every block example validates', () => {
 	const r = validate(schema.ENVELOPE.example)
 	assert.equal(r.ok, true)
 	for (const [name, def] of Object.entries(schema.BLOCKS)) {
-		const doc = { instantcanvas: 1, title: 'ex', blocks: [def.example] }
+		const doc = { instantcanvas: 1, createdWith: SKILL_VERSION, title: 'ex', blocks: [def.example] }
 		const res = validate(doc)
 		assert.equal(res.ok, true, `${name} example validates: ${JSON.stringify(res.errors)}`)
 		assert.deepEqual(res.warnings, [], `${name} example has no warnings`)

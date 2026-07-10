@@ -21,9 +21,10 @@ const { Sessions } = require('./lib/session')
 const envfile = require('./lib/envfile')
 const jsonfile = require('./lib/jsonfile')
 const { DEFAULT_URL_PROTOCOLS } = require('./lib/schema')
+const { SKILL_VERSION } = require('./lib/skillmeta')
 
 const WEB_DIR = path.join(__dirname, 'web')
-const VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'skill.json'), 'utf8')).version
+const VERSION = SKILL_VERSION
 const MAX_BODY = 10 * 1024 * 1024
 const IDLE_LIMIT_MS = 30 * 60 * 1000
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
@@ -558,7 +559,9 @@ function serveShell(res) {
 	} catch {
 		return sendJson(res, 500, { ok: false, message: 'App shell missing.' })
 	}
-	html = html.replaceAll('__IC_TOKEN__', TOKEN)
+	// CSP forbids inline <script>, so both the token and the version reach the
+	// page as placeholder substitutions rather than injected globals.
+	html = html.replaceAll('__IC_TOKEN__', TOKEN).replaceAll('__IC_VERSION__', VERSION)
 	res.writeHead(200, {
 		'Content-Type': 'text/html; charset=utf-8',
 		'X-Content-Type-Options': 'nosniff',

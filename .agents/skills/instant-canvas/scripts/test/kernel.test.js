@@ -19,6 +19,7 @@ const FIXTURES = path.join(__dirname, 'fixtures')
 process.env.INSTANTCANVAS_STATE_DIR = process.env.INSTANTCANVAS_STATE_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'ic-kstate-'))
 const STATE_DIR = process.env.INSTANTCANVAS_STATE_DIR
 const registry = require('../lib/registry')
+const { SKILL_VERSION } = require('../lib/skillmeta')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -202,7 +203,8 @@ test('kernel: GET /api/canvas returns parsed canvas or validation errors', async
 	const ok = await httpReq({ port: K.port, path: '/api/canvas?path=report.canvas.json', headers: K.auth })
 	assert.equal(ok.status, 200)
 	assert.equal(ok.json.canvas.title, 'Valid display fixture')
-	fs.writeFileSync(path.join(K.root, 'bad.canvas.json'), '{"instantcanvas":1,"title":"bad","blocks":[{"type":"nope"}]}')
+	// Stamped on purpose: this canvas must fail on its block type, not on a missing stamp.
+	fs.writeFileSync(path.join(K.root, 'bad.canvas.json'), `{"instantcanvas":1,"createdWith":"${SKILL_VERSION}","title":"bad","blocks":[{"type":"nope"}]}`)
 	const bad = await httpReq({ port: K.port, path: '/api/canvas?path=bad.canvas.json', headers: K.auth })
 	assert.equal(bad.status, 422)
 	assert.equal(bad.json.errors[0].code, 'UNKNOWN_BLOCK_TYPE')

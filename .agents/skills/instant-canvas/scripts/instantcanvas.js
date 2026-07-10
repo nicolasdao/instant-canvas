@@ -21,8 +21,10 @@ const { log, redact, errorOut } = require('./lib/redact')
 const { validate, renderHuman } = require('./lib/validate')
 const { catalog } = require('./lib/catalog')
 const { openUrl } = require('./lib/browser')
+const { writeAtomic } = require('./lib/fsatomic')
+const { SKILL_VERSION, UNKNOWN_VERSION } = require('./lib/skillmeta')
 
-const VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'skill.json'), 'utf8')).version
+const VERSION = SKILL_VERSION
 const KERNEL = path.join(__dirname, 'kernel.js')
 
 const USAGE = `InstantCanvas v${VERSION} — local canvas runtime for coding agents
@@ -33,6 +35,10 @@ Commands:
   open <canvas.json> [--workspace <dir>] [--no-open] [--timeout <s>] [--result <file>]
       Render a canvas in the browser. Display canvases return immediately;
       interactive canvases (form/confirm) block until the human responds.
+  stamp <canvas.json> [--workspace <dir>] [--retrofit]
+      Write this skill's version into the canvas as "createdWith". Idempotent:
+      an existing stamp is never rewritten. --retrofit stamps "unknown" for a
+      canvas created before stamping existed. Every canvas needs this once.
   validate <canvas.json>       Validate a canvas file, print JSON verdict.
   catalog [name] [--full]      Lean index; <name> = block | chart kind | field
                                type | fieldset | envelope for ONE full schema.
@@ -81,6 +87,7 @@ function parseArgs(argv) {
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i]
 		if (a === '--no-open') args.noOpen = true
+		else if (a === '--retrofit') args.retrofit = true
 		else if (a === '--full') args.full = true
 		else if (a === '--workspace') args.workspace = argv[++i]
 		else if (a === '--timeout') args.timeout = Number(argv[++i])
@@ -263,6 +270,62 @@ async function cmdOpen(args) {
 	}
 }
 
+/** Reuse the file's own indentation so stamping produces a minimal diff. */
+function detectIndent(raw) {
+	const m = /\n([ \t]+)\S/.exec(raw)
+	return m ? m[1] : '\t'
+}
+
+/**
+ * Write the provenance stamp. This command is the ONLY writer of "createdWith":
+ * the version comes from the running skill, never from the agent, which is what
+ * makes the stamp trustworthy enough to migrate against.
+ *
+ * Idempotent by design — a canvas records the version that BORE it, so an
+ * existing stamp is left exactly as found no matter how old it is.
+ */
+function cmdStamp(args) {
+	const file = args._[0]
+	if (!file)
+		specError('INVALID_SPEC', 'stamp requires a canvas file argument.')
+	const root = resolveWorkspace(args)
+	const abs = path.resolve(file)
+	if (!fs.existsSync(abs))
+		specError('INVALID_SPEC', `Canvas file not found: ${abs}`)
+	const rel = path.relative(root, fs.realpathSync(abs)).split(path.sep).join('/')
+	if (rel.startsWith('..') || path.isAbsolute(rel))
+		specError('PATH_OUTSIDE_WORKSPACE',
+			`${abs} is outside the workspace root ${root}. Pass --workspace <dir> pointing at the folder that contains the canvas.`)
+
+	const raw = fs.readFileSync(abs, 'utf8')
+	let canvas
+	try {
+		canvas = JSON.parse(raw)
+	} catch (err) {
+		specError('INVALID_JSON', `The file is not valid JSON, so it cannot be stamped: ${err.message}`)
+	}
+	// Never stamp arbitrary JSON: the marker is what makes this file a canvas.
+	if (!canvas || typeof canvas !== 'object' || Array.isArray(canvas) || canvas.instantcanvas !== 1)
+		specError('INVALID_SPEC', `${rel} is not a canvas: its top level must carry "instantcanvas": 1.`)
+
+	if (canvas.createdWith !== undefined) {
+		log(`${rel} already stamped createdWith=${canvas.createdWith} — left unchanged.`)
+		out({ status: 'stamped', canvas: rel, createdWith: canvas.createdWith, changed: false, timestamp: now() }, 0)
+	}
+
+	const createdWith = args.retrofit ? UNKNOWN_VERSION : VERSION
+	// Rebuild so the stamp sits next to the marker rather than at the end.
+	const stamped = {}
+	for (const key of Object.keys(canvas)) {
+		stamped[key] = canvas[key]
+		if (key === 'instantcanvas')
+			stamped.createdWith = createdWith
+	}
+	writeAtomic(abs, JSON.stringify(stamped, null, detectIndent(raw)) + '\n')
+	log(`${rel} stamped createdWith=${createdWith}`)
+	out({ status: 'stamped', canvas: rel, createdWith, changed: true, timestamp: now() }, 0)
+}
+
 function cmdValidate(args) {
 	const file = args._[0]
 	if (!file)
@@ -329,6 +392,7 @@ async function main() {
 
 	switch (command) {
 		case 'open': return cmdOpen(args)
+		case 'stamp': return cmdStamp(args)
 		case 'validate': return cmdValidate(args)
 		case 'catalog': return cmdCatalog(args)
 		case 'status': return cmdStatus(args)
