@@ -14,7 +14,7 @@ cd .agents/skills/instant-canvas
 node --test scripts/test/
 ```
 
-121 tests at last count, twenty-one of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
+122 tests at last count, twenty-two of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
 
 ## Suite layout
 
@@ -31,7 +31,7 @@ node --test scripts/test/
 | `cli.test.js` | Usage/exit codes, validate/catalog output, the full open lifecycle including kill -9 recovery and `--result`. |
 | `forms.test.js` | Blocking `open` + HTTP submit: `.env` round-trip with redaction sweep, overwrite/outside-root 409 handshakes, confirm/timeout/cancel, json destinations, url-protocol and patternMessage rules. |
 | `hardening.test.js` | Source scans (loopback literal, no third-party requires, timing-safe compare, no CORS, no `console.log` server-side) and runtime error codes (`WRITE_FAILED`, `SESSION_TIMEOUT`, `KERNEL_UNREACHABLE`). |
-| `render.test.js` | Real headless Chrome via `helpers/cdp.js`: an adversarial canvas (splom + violin + 3D + skill-rendered kinds + a sweep + a markdown document) must draw every chart, expose a slider, highlight fenced code, inline a local image as a `data:` URI, carry **no** `style=""` attribute, and log zero CSP violations. Skips without Chrome. |
+| `render.test.js` | Real headless Chrome via `helpers/cdp.js`: an adversarial canvas (splom + violin + 3D + skill-rendered kinds + a sweep + a markdown document) must draw every chart, expose a slider, highlight fenced code, inline a local PNG **and SVG** as `data:` URIs, show an always-visible copy button that survives a real clipboard round-trip, carry **no** `style=""` attribute, and log zero CSP violations. Skips without Chrome. |
 | `browse.test.js` | Real headless Chrome: the folder-browser modal must list, select without re-listing, and descend by chevron, double-click, and breadcrumb. Skips without Chrome. |
 | `search.test.js` | Real headless Chrome: the search modal must open without fetching, match on name and folder, survive `c++` and `<script>` queries, never mark inside an entity, and wire ⌘K / `/` / arrows / Esc correctly. Skips without Chrome. |
 
