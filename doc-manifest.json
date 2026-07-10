@@ -184,7 +184,7 @@
         "CSP shim",
         "Icons and vendored assets"
       ],
-      "line_count": 66,
+      "line_count": 67,
       "links_to": [
         "docs/gotchas/frontend.md"
       ],
@@ -196,7 +196,8 @@
         ".agents/skills/instant-canvas/scripts/web/app.js",
         ".agents/skills/instant-canvas/scripts/web/csp-shim.js",
         ".agents/skills/instant-canvas/scripts/web/styles.css",
-        ".agents/skills/instant-canvas/scripts/web/vendor/**"
+        ".agents/skills/instant-canvas/scripts/web/vendor/**",
+        "assets/logo.svg"
       ],
       "source_unresolved": [],
       "tags": [
@@ -248,6 +249,7 @@
         "CSP silently drops `style=\"\"` attributes",
         "Plotly injects a `<style>` element unless you claim its id",
         "Plotly cannot read CSS variables",
+        "A linked SVG cannot be themed, so the brand mark is inlined",
         "Retheme with `Plotly.react`, never purge + newPlot",
         "A chart can vanish from a canvas with no error anywhere",
         "`splom` with two dimensions draws nothing",
@@ -260,7 +262,7 @@
         "themeRiver needs real dates",
         "Constraint API quirks around custom widgets"
       ],
-      "line_count": 71,
+      "line_count": 75,
       "links_to": [],
       "over_size": false,
       "parse_error": null,

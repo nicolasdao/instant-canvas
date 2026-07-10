@@ -24,6 +24,10 @@ At load, Plotly's `addRelatedStyleRule` (`src/lib/dom.js`) creates `<style id="p
 
 `color: var(--c1)` inside a Plotly figure resolves to nothing — it paints to SVG/canvas and never consults your stylesheet. Two concrete palettes (`LIGHT`/`DARK`) are compiled into `layout.template` by `plotlyTemplate()`, and the theme toggle rebuilds each figure on the other palette.
 
+## A linked SVG cannot be themed, so the brand mark is inlined
+
+`img-src 'self' data:` permits `<img src="/assets/logo.svg">`, so the topbar logo *loads* — and then ignores the theme, because an SVG referenced by `<img>` renders in an isolated document that cannot see the host page's custom properties. The mark is therefore inlined into `index.html` (like the Lucide icons), and its fills read `--logo-base`/`--logo-accent`. The standalone `assets/logo.svg` carries the same rules in an internal `<style>` block for use outside the page; do not copy that block into `index.html`, where `style-src 'self'` blocks it.
+
 ## Retheme with `Plotly.react`, never purge + newPlot
 
 Each 3D or WebGL chart (`scatter3d`, `surface`, `parcoords`, `splom`) owns a WebGL context, and **Plotly never calls `loseContext()` on teardown** — the context waits for GC. Browsers cap live contexts (~8–16) and drop the oldest. Measured: six theme toggles via `purge` + `newPlot` created **6** contexts and released **0**; six via `Plotly.react` created **1**. `rethemeCharts()` therefore updates in place, and the toggle no longer re-renders the whole canvas — everything that isn't a chart follows the CSS variables for free.

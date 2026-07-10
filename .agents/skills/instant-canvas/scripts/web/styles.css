@@ -7,6 +7,7 @@
 	--inp-bg:#ffffff; --inp-border:#d3d8e0; --inp-border-hover:#b9c0cc;
 	--inp-shadow:0 1px 2px rgba(16,20,30,.05);
 	--fset-border:#c3cad5;
+	--logo-base:#00184d; --logo-accent:#0054fe;
 	color-scheme:light;
 }
 :root[data-theme="dark"]{
@@ -17,6 +18,7 @@
 	--inp-bg:#1b1f29; --inp-border:#2d3442; --inp-border-hover:#3c4556;
 	--inp-shadow:none;
 	--fset-border:#2d3442;
+	--logo-base:#2a3a6b; --logo-accent:#2f6bff;
 	color-scheme:dark;
 }
 @media (prefers-color-scheme:dark){
@@ -28,6 +30,7 @@
 		--inp-bg:#1b1f29; --inp-border:#2d3442; --inp-border-hover:#3c4556;
 		--inp-shadow:none;
 		--fset-border:#2d3442;
+		--logo-base:#2a3a6b; --logo-accent:#2f6bff;
 		color-scheme:dark;
 	}
 }
@@ -59,8 +62,9 @@ button{font:inherit;cursor:pointer}
 .topbar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel);
 	border-bottom:1px solid var(--border);flex:0 0 auto}
 .brand{display:flex;align-items:center;gap:8px;font-weight:650;letter-spacing:-.01em}
-.brand .logo{width:20px;height:20px;border-radius:50%;
-	background:conic-gradient(var(--accent) 50%, transparent 50%);border:2px solid var(--accent)}
+.brand .logo{width:20px;height:20px;flex:0 0 auto;display:block}
+.brand .logo .ic-logo-base{fill:var(--logo-base)}
+.brand .logo .ic-logo-accent{fill:var(--logo-accent)}
 .rootpath{color:var(--muted);font-size:12.5px;padding:3px 8px;border:1px solid var(--border);
 	border-radius:7px;background:var(--panel-2);flex:1;min-width:60px;
 	white-space:nowrap;overflow:hidden;text-overflow:clip;

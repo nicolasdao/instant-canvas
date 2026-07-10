@@ -7,6 +7,7 @@ source:
   - .agents/skills/instant-canvas/scripts/web/csp-shim.js
   - .agents/skills/instant-canvas/scripts/web/styles.css
   - .agents/skills/instant-canvas/scripts/web/vendor/**
+  - assets/logo.svg
 ---
 
 # Frontend
@@ -63,4 +64,4 @@ Two mechanisms, deliberately separate:
 
 ## Icons and vendored assets
 
-All icons are Lucide (ISC) — only the ~20 used SVG paths are inlined (the `LUCIDE` map in `app.js` plus the static topbar), not the library. Provenance for everything third-party lives in `scripts/web/vendor/VENDORED.md`: a **custom strict Plotly.js 3.7.0 build** (no map traces; see the rebuild recipe and why no published dist substitutes), its extracted `plotly.css`, and the markdown-it 14.3.0 UMD build — all served to the browser, never `require`d by Node.
+All icons are Lucide (ISC) — only the ~20 used SVG paths are inlined (the `LUCIDE` map in `app.js` plus the static topbar), not the library. The brand mark in the topbar is inlined the same way (an `<img>` could not follow the theme, since a linked SVG cannot see the page's custom properties); its two fills come from `--logo-base`/`--logo-accent`, and the canonical standalone file is `assets/logo.svg` at the repo root. Provenance for everything third-party lives in `scripts/web/vendor/VENDORED.md`: a **custom strict Plotly.js 3.7.0 build** (no map traces; see the rebuild recipe and why no published dist substitutes), its extracted `plotly.css`, and the markdown-it 14.3.0 UMD build — all served to the browser, never `require`d by Node.
