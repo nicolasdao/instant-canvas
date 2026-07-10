@@ -33,10 +33,19 @@ const skip = CHROME ? false : 'Chrome not found — set CHROME_PATH to run the r
 
 // One page, on purpose. Every kind here has burned us or exercises a distinct
 // render path (WebGL, skill-owned layout, sweep frames).
+// markdown-it emits style="text-align:right" for `|---:|`, which the CSP drops
+// silently; task lists are a skill-side core rule. Both belong in the browser test.
+const DOC = [
+	'# Doc', '', 'Prose.', '',
+	'- [x] done', '- [ ] todo', '',
+	'| a | b |', '|---|---:|', '| 1 | 2 |', '',
+].join('\n')
+
 const CANVAS = {
 	instantcanvas: 1,
 	title: 'render smoke',
 	blocks: [
+		{ type: 'markdown', text: DOC },
 		// splom corrupted the shared axis registry for whatever mounted next…
 		{ type: 'chart', kind: 'splom', title: 'splom',
 			data: [{ a: 1, b: 2, c: 3 }, { a: 2, b: 1, c: 2 }, { a: 3, b: 3, c: 1 }],
@@ -127,6 +136,10 @@ test.before(async () => {
 					stub: !!document.getElementById('plotly.js-style-global'),
 					csp: window.__csp || [],
 					pageErrors: window.__pageErrors || [],
+					mdInlineStyled: document.querySelectorAll('.md [style]').length,
+					mdTasks: document.querySelectorAll('.md li.task').length,
+					mdChecked: document.querySelectorAll('.md li.task input[type=checkbox]:checked').length,
+					mdRightAligned: document.querySelectorAll('.md table .ta-right').length,
 				};
 			})()
 		`)
@@ -150,6 +163,14 @@ test('every chart in an adversarial canvas actually renders', { skip, timeout: 1
 test('a swept chart renders an interactive slider', { skip, timeout: 120_000 }, () => {
 	assert.ok(snapshot.sliders >= 1, 'the sweep block drew a Plotly slider')
 	assert.ok(snapshot.railed >= 1, 'the slider has a drag rail')
+})
+
+test('markdown renders as a document, with no inline styles for the CSP to drop', { skip, timeout: 120_000 }, () => {
+	// markdown-it's own column alignment is a style="" attribute; it must arrive as a class.
+	assert.equal(snapshot.mdInlineStyled, 0, 'no style="" attribute survives into the markdown block')
+	assert.equal(snapshot.mdRightAligned, 2, 'the `|---:|` column is right-aligned by class (th + td)')
+	assert.equal(snapshot.mdTasks, 2, 'both task-list items rendered as tasks')
+	assert.equal(snapshot.mdChecked, 1, 'only the [x] item is checked')
 })
 
 test('the kernel CSP is never violated, and Plotly injects no stylesheet', { skip, timeout: 120_000 }, () => {

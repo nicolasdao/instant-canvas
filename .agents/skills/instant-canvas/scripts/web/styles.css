@@ -133,20 +133,52 @@ button{font:inherit;cursor:pointer}
 
 /* blocks */
 .block{margin:22px 0}
-.md h1{font-size:18px;margin:26px 0 8px;letter-spacing:-.01em}
-.md h2{font-size:16px;margin:24px 0 6px;letter-spacing:-.01em}
-.md h3{font-size:13.5px;margin:20px 0 6px;color:var(--muted)}
-.md p{margin:6px 0;color:var(--text)}
+/* markdown — a document renderer, not a caption renderer. Measure is capped for
+   readability; the heading scale descends (h3 used to render smaller and fainter
+   than body text). Nothing here may use an inline style — the CSP drops them. */
+.md{max-width:68ch;line-height:1.65}
+.md>:first-child{margin-top:0}
+.md>:last-child{margin-bottom:0}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{color:var(--text);line-height:1.3;font-weight:650}
+.md h1{font-size:26px;font-weight:680;margin:32px 0 12px;letter-spacing:-.02em}
+.md h2{font-size:20px;margin:30px 0 10px;letter-spacing:-.015em;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.md h3{font-size:16px;margin:24px 0 8px;letter-spacing:-.01em}
+.md h4{font-size:14px;margin:20px 0 6px}
+.md h5{font-size:13px;margin:18px 0 6px}
+.md h6{font-size:12px;margin:18px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.md p{margin:12px 0;color:var(--text)}
 .md strong{font-weight:650}
+.md hr{height:1px;border:0;background:var(--border);margin:28px 0}
+.md img{display:block;max-width:100%;height:auto;margin:16px 0;border-radius:8px}
 .md code{background:var(--panel-2);border:1px solid var(--border-2);border-radius:4px;padding:1px 5px;
 	font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
-.md pre{background:var(--panel-2);border:1px solid var(--border-2);border-radius:8px;padding:12px 14px;overflow:auto}
-.md pre code{background:none;border:none;padding:0}
-.md ul,.md ol{margin:6px 0;padding-left:22px}
+.md pre{background:var(--panel-2);border:1px solid var(--border-2);border-radius:8px;padding:14px 16px;
+	margin:16px 0;overflow:auto;line-height:1.55}
+.md pre code{background:none;border:none;padding:0;font-size:12.5px}
+.md ul,.md ol{margin:12px 0;padding-left:24px}
+.md li{margin:4px 0}
+.md li>ul,.md li>ol{margin:4px 0}
 .md a{color:var(--accent)}
-.md blockquote{margin:8px 0;padding:4px 14px;border-left:3px solid var(--border);color:var(--muted)}
-.md table{border-collapse:collapse;margin:8px 0}
-.md table td,.md table th{border:1px solid var(--border);padding:5px 10px;font-size:13px}
+.md a:hover{text-decoration:underline}
+.md blockquote{margin:16px 0;padding:6px 16px;border-left:3px solid var(--border);color:var(--muted)}
+.md blockquote p{color:inherit}
+/* display:block + overflow-x makes a wide table scroll instead of blowing the measure. */
+.md table{display:block;width:fit-content;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:16px 0}
+.md table td,.md table th{border:1px solid var(--border);padding:7px 12px;font-size:13px}
+.md table th{background:var(--panel-2);font-weight:650;text-align:left}
+/* markdown-it's column alignment, rewritten from style="" to a class (CSP). */
+.md table .ta-left{text-align:left}
+.md table .ta-center{text-align:center}
+.md table .ta-right{text-align:right}
+
+/* GFM task lists (emitted by the markdown-it core rule in app.js). The checkbox is
+   inline rather than a flex child: a loose list item keeps its <p>, so the input is
+   not always a direct child of the <li>. */
+.md .task-list{list-style:none;padding-left:2px}
+.md .task-list .task-list{padding-left:22px}
+.md li.task input[type=checkbox]{width:16px;height:16px;margin:0 8px 0 0;vertical-align:-3px}
+.md li.task input[type=checkbox]:disabled{cursor:default}
+.md li.task input[type=checkbox]:disabled:not(:checked){background:var(--panel-2)}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}

@@ -105,6 +105,67 @@ function toast(msg) {
 
 const md = window.markdownit({ html: false, linkify: true })
 
+// GFM task lists. markdown-it has no rule for them and a plugin would be another
+// vendored file, so rewrite the tokens here: "[ ] " / "[x] " at the head of a list
+// item becomes a disabled checkbox. The emitted markup carries classes only — a
+// style="" attribute would be dropped by the CSP without an error.
+const TASK_RE = /^\[([ xX])\](\s+|$)/
+
+function taskLists(state) {
+	const tokens = state.tokens
+	for (let i = 2; i < tokens.length; i++) {
+		const inline = tokens[i]
+		if (inline.type !== 'inline' || !TASK_RE.test(inline.content)) continue
+		// The head of a list item is always list_item_open, paragraph_open, inline.
+		const item = tokens[i - 2]
+		if (item.type !== 'list_item_open' || tokens[i - 1].type !== 'paragraph_open') continue
+
+		const checked = TASK_RE.exec(inline.content)[1] !== ' '
+		inline.content = inline.content.replace(TASK_RE, '')
+		const first = inline.children[0]
+		if (first && first.type === 'text') first.content = first.content.replace(TASK_RE, '')
+
+		const box = new state.Token('html_inline', '', 0)
+		box.content = `<input type="checkbox" disabled${checked ? ' checked' : ''}>`
+		inline.children.unshift(box)
+
+		item.attrJoin('class', 'task')
+		const list = listOpenFor(tokens, i - 2, item.level)
+		if (list && !/\btask-list\b/.test(list.attrGet('class') || ''))
+			list.attrJoin('class', 'task-list')
+	}
+	return true
+}
+
+/** The *_list_open that encloses the list item at `from` (one nesting level out). */
+function listOpenFor(tokens, from, itemLevel) {
+	for (let j = from - 1; j >= 0; j--) {
+		const t = tokens[j]
+		if ((t.type === 'bullet_list_open' || t.type === 'ordered_list_open') && t.level === itemLevel - 1)
+			return t
+	}
+	return null
+}
+
+// markdown-it renders `|---:|` column alignment as style="text-align:right", which
+// `style-src 'self'` drops without an error — the alignment silently never applied.
+// Rewrite it to a class before it ever reaches the DOM.
+const ALIGN_RE = /text-align:\s*(left|center|right)/
+
+function tableAlign(state) {
+	for (const token of state.tokens) {
+		if (token.type !== 'th_open' && token.type !== 'td_open') continue
+		const m = ALIGN_RE.exec(token.attrGet('style') || '')
+		if (!m) continue
+		token.attrs = token.attrs.filter(([name]) => name !== 'style')
+		token.attrJoin('class', `ta-${m[1]}`)
+	}
+	return true
+}
+
+md.core.ruler.after('inline', 'task_lists', taskLists)
+md.core.ruler.after('inline', 'table_align', tableAlign)
+
 // ---------------------------------------------------------------- theming
 
 // Plotly paints to canvas/SVG and never reads CSS var(), so the palette is
