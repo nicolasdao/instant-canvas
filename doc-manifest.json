@@ -170,7 +170,7 @@
     },
     {
       "dangling": false,
-      "description": "The browser app — shell, block renderers, bespoke form widgets, chart mapping, sweeps, theming, icons, and the CSP constraints that shape the code.",
+      "description": "The browser app — shell, sidebar, canvas search, folder browser, block renderers, bespoke form widgets, chart mapping, sweeps, theming, and the CSP constraints that shape the code.",
       "has_frontmatter": true,
       "headings": [
         "Frontend",
@@ -184,7 +184,7 @@
         "CSP shim",
         "Icons and vendored assets"
       ],
-      "line_count": 67,
+      "line_count": 69,
       "links_to": [
         "docs/gotchas/frontend.md"
       ],
@@ -257,12 +257,15 @@
         "Plotly has no network or streamgraph trace",
         "The `options` escape hatch is a Plotly figure fragment, merged by index",
         "Never write a literal NUL into `app.js`",
-        "Re-rendering a popover detaches the clicked element",
+        "Re-rendering on click detaches the element that was clicked",
+        "Highlighting search matches by string-building is two bugs, not one",
+        "A modal opened by keyboard has nowhere to restore focus to",
+        "Body scroll lock does nothing here",
         "Native widget chrome ignores your dark theme",
         "themeRiver needs real dates",
         "Constraint API quirks around custom widgets"
       ],
-      "line_count": 75,
+      "line_count": 89,
       "links_to": [],
       "over_size": false,
       "parse_error": null,
@@ -366,6 +369,8 @@
         "A green suite does not mean the charts drew",
         "`--dump-dom --virtual-time-budget` hides concurrency bugs",
         "Never set a `Host` header on Chrome's `/json/list`",
+        "Waiting for an element does not mean the app is listening",
+        "A throwing `waitFor` in a `before` hook reports the wrong failure",
         "A new test that cannot fail is worse than no test",
         "Subtests cannot reach parent-context servers (Node 24.0.x)",
         "`node --test <dir>` does not expand the directory",
@@ -373,7 +378,7 @@
         "A security scan can trip over its own test file",
         "Fake registry entries in shared state dirs look like leaks"
       ],
-      "line_count": 44,
+      "line_count": 52,
       "links_to": [],
       "over_size": false,
       "parse_error": null,
@@ -459,7 +464,7 @@
     },
     {
       "dangling": false,
-      "description": "The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven browser verification used during development.",
+      "description": "The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven headless-Chrome tests that verify rendering and UI interaction.",
       "has_frontmatter": true,
       "headings": [
         "Testing",
@@ -468,7 +473,7 @@
         "Security regressions",
         "Browser verification"
       ],
-      "line_count": 54,
+      "line_count": 60,
       "links_to": [
         "docs/gotchas/testing.md"
       ],

@@ -51,7 +51,7 @@ node scripts/instantcanvas.js open my.canvas.json       # one JSON result on std
 node scripts/instantcanvas.js status
 node scripts/instantcanvas.js stop
 
-# tests (86, zero deps; the browser test skips without Chrome)
+# tests (101, zero deps; the browser tests skip without Chrome)
 node --test scripts/test/
 ```
 
@@ -84,11 +84,11 @@ Start with the mission — it is the decision-making compass for this project, a
 - [Architecture](docs/architecture.md) — How the CLI, per-workspace kernel, and browser fit together — process model, registry, sessions, hot reload, and the security perimeter.
 - [Canvas Schema, Validator, and Catalog](docs/canvas-schema.md) — The canvas JSON contract — envelope, six block types, 26 chart kinds, 16 field types, fieldset layout, validation rules, and the progressive-disclosure catalog.
 - [CLI](docs/cli.md) — The instantcanvas CLI — commands, flags, exit codes, stdout discipline, the result contract, and the agent workflow it enables.
-- [Frontend](docs/frontend.md) — The browser app — shell, block renderers, bespoke form widgets, chart mapping, sweeps, theming, icons, and the CSP constraints that shape the code.
+- [Frontend](docs/frontend.md) — The browser app — shell, sidebar, canvas search, folder browser, block renderers, bespoke form widgets, chart mapping, sweeps, theming, and the CSP constraints that shape the code.
 - [Gotchas](docs/gotchas.md)
 - [InstantCanvas — Mission](docs/mission.md)
 - [Security Model](docs/security.md) — The secret-handling model — what InstantCanvas guarantees, how redaction and workspace confinement work, and what it deliberately does not protect against.
-- [Testing](docs/testing.md) — The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven browser verification used during development.
+- [Testing](docs/testing.md) — The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven headless-Chrome tests that verify rendering and UI interaction.
 <!-- END doc-index -->
 
 Gotchas are indexed in [docs/gotchas.md](docs/gotchas.md) — read the relevant domain file before touching a subsystem.

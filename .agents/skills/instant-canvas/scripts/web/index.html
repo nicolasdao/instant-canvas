@@ -19,7 +19,10 @@
 		<aside class="sidebar">
 			<div class="side-head">
 				<span>WORKSPACE</span>
-				<button class="side-add" id="openFolder" title="Open another workspace folder"><svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+				<span class="side-actions">
+					<button class="side-add" id="openSearch" aria-haspopup="dialog" title="Search canvases (⌘K)" aria-label="Search canvases"><svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+					<button class="side-add" id="openFolder" title="Open another workspace folder" aria-label="Open another workspace folder"><svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+				</span>
 			</div>
 			<div class="tree" id="tree"></div>
 			<div class="side-foot">
@@ -30,6 +33,28 @@
 		<main class="main" id="main"></main>
 	</div>
 </div>
+
+<!-- Frosted-glass canvas search. Mounted once, hidden until opened; the index is
+     the workspace tree the sidebar already holds, so opening it fetches nothing. -->
+<div class="csm" id="searchModal" hidden>
+	<div class="csm-overlay" data-csm-close></div>
+	<div class="csm-panel" role="dialog" aria-modal="true" aria-label="Search canvases">
+		<div class="csm-head">
+			<span class="csm-ic" aria-hidden="true"><svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
+			<input class="csm-input" id="csmInput" type="text" placeholder="Search canvases…" autocomplete="off" autocapitalize="off" spellcheck="false"
+				role="combobox" aria-expanded="true" aria-autocomplete="list" aria-controls="csmResults" aria-label="Search canvases">
+			<button class="csm-esc" type="button" data-csm-close aria-label="Close search"><kbd aria-hidden="true">Esc</kbd></button>
+		</div>
+		<p class="csm-status" id="csmStatus"></p>
+		<div class="csm-results" id="csmResults" role="listbox" aria-label="Search results" hidden></div>
+		<div class="csm-foot" aria-hidden="true">
+			<span><kbd>↑</kbd><kbd>↓</kbd> to navigate</span>
+			<span><kbd>↵</kbd> to open</span>
+			<span><kbd>esc</kbd> to close</span>
+		</div>
+	</div>
+</div>
+
 <script src="/assets/vendor/markdown-it.min.js?token=__IC_TOKEN__"></script>
 <script src="/assets/csp-shim.js?token=__IC_TOKEN__"></script>
 <script src="/assets/vendor/plotly.min.js?token=__IC_TOKEN__"></script>

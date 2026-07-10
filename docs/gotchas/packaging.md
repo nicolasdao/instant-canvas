@@ -12,7 +12,7 @@ source:
 
 `release`/`publish` bundles the **entire** `.agents/skills/instant-canvas/` folder; whatever you drop in there reaches every consumer and competes for their agents' context. That is why this repo splits **product** (the skill folder: SKILL.md, scripts, examples, vendored assets) from **workbench** (repo-level `docs/`, `specs/`, `prototype/`, `demos/`, tooling). Never add design notes, specs, test tooling, or dev docs inside the skill folder — put them at the repo level. The inverse also holds: anything a consumer needs must live *inside* the skill folder, because the published bundle is all they get.
 
-Note that `scripts/test/` (~88 KB, and growing — the browser smoke test and its CDP client landed there) currently ships, because the walker in `file_size_rules.js` skips only dotfiles and `node_modules`.
+Note that `scripts/test/` (~112 KB, and growing — the three browser tests and their CDP client landed there) currently ships, because the walker in `file_size_rules.js` skips only dotfiles and `node_modules`. It grew ~24 KB the session `browse.test.js` and `search.test.js` were added; re-measure rather than trust this figure.
 
 ## Two size caps, and the per-file one is the sharp edge
 

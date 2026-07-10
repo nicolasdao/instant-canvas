@@ -1,5 +1,5 @@
 ---
-description: The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven browser verification used during development.
+description: The zero-dependency node:test suite — layout, isolation patterns, security regressions, and the CDP-driven headless-Chrome tests that verify rendering and UI interaction.
 tags: [testing, node-test, cdp, verification]
 source:
   - .agents/skills/instant-canvas/scripts/test/**
@@ -14,7 +14,7 @@ cd .agents/skills/instant-canvas
 node --test scripts/test/
 ```
 
-86 tests at last count, three of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
+101 tests at last count, eighteen of which drive a real browser and skip when Chrome is absent. `scripts/test/index.js` exists because `node --test <dir>` does not expand a directory on the pinned Node version — the directory resolves to `index.js`, which requires every `*.test.js` (see [gotchas/testing.md](gotchas/testing.md)).
 
 ## Suite layout
 
@@ -31,6 +31,8 @@ node --test scripts/test/
 | `forms.test.js` | Blocking `open` + HTTP submit: `.env` round-trip with redaction sweep, overwrite/outside-root 409 handshakes, confirm/timeout/cancel, json destinations, url-protocol and patternMessage rules. |
 | `hardening.test.js` | Source scans (loopback literal, no third-party requires, timing-safe compare, no CORS, no `console.log` server-side) and runtime error codes (`WRITE_FAILED`, `SESSION_TIMEOUT`, `KERNEL_UNREACHABLE`). |
 | `render.test.js` | Real headless Chrome via `helpers/cdp.js`: an adversarial canvas (splom + violin + 3D + skill-rendered kinds + a sweep) must draw every chart, expose a slider, and log zero CSP violations. Skips without Chrome. |
+| `browse.test.js` | Real headless Chrome: the folder-browser modal must list, select without re-listing, and descend by chevron, double-click, and breadcrumb. Skips without Chrome. |
+| `search.test.js` | Real headless Chrome: the search modal must open without fetching, match on name and folder, survive `c++` and `<script>` queries, never mark inside an entity, and wire ⌘K / `/` / arrows / Esc correctly. Skips without Chrome. |
 
 ## Isolation patterns
 
@@ -51,4 +53,8 @@ Two traps it encodes:
 - **Do not use `--dump-dom --virtual-time-budget`.** It needs no WebSocket client and is therefore very tempting, but virtual time runs the event loop to quiescence between steps, so races never manifest — it reported a full canvas on a build where a real browser dropped a chart.
 - **Do not set a `Host` header on `/json/list`.** Chrome echoes it back when building `webSocketDebuggerUrl`; a portless `Host` yields a portless `ws://` URL that then connects to port 80.
 
-Deeper interaction (dragging a slider, clicking a date picker, capturing screenshots) is still development practice rather than suite coverage: extend the same client with `Input.dispatchMouseEvent` / `Page.captureScreenshot`. That practice caught the date-picker's self-closing arrows, the CSP-dropped grid styles, and the chart `options` series wipe-out.
+`browse.test.js` and `search.test.js` drive the same client one level deeper — they *click*, and assert on what the click did. Both exist because the server was never wrong: `POST /api/browse` returned correct listings while the folder browser was unnavigable, and search has no server side at all. Only a real browser could see either. Both encode the two traps in [gotchas/testing.md](gotchas/testing.md) — poll for `window.ic`, not for an element that exists before `app.js` binds it; and use a non-throwing `until()` so one dead step fails one assertion instead of sinking the hook.
+
+`helpers/cdp.js` hands `fn` a raw `send(method, params)` alongside `evaluate`, so a test — or a development-time script — reaches `Page.captureScreenshot` and `Emulation.setDeviceMetricsOverride` directly. The search modal was reviewed as rendered pixels in light and dark that way, not only as asserted DOM.
+
+Real mouse and keyboard input (`Input.dispatchMouseEvent` — dragging a slider, hovering a chart) is still development practice rather than suite coverage. That practice caught the date-picker's self-closing arrows, the CSP-dropped grid styles, and the chart `options` series wipe-out.

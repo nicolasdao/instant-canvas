@@ -2258,6 +2258,9 @@ function connectWs() {
 			if (json && json.ok) {
 				state.tree = json
 				renderTree()
+				// A new tree object invalidates the search index; re-filter if it's on screen.
+				if (!$('searchModal').hidden)
+					renderSearch($('csmInput').value)
 			}
 		} else if (msg.type === 'canvas') {
 			if (msg.path === state.activeId)
@@ -2284,6 +2287,26 @@ function connectWs() {
 
 $('openFolder').addEventListener('click', () => openFolderModal())
 
+const baseName = (p) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p
+
+/** Split an absolute path into cumulative {label, path} breadcrumb segments. */
+function crumbSegments(p) {
+	const sep = !p.startsWith('/') && p.includes('\\') ? '\\' : '/'
+	const segs = []
+	let acc = ''
+	p.split(/[\\/]/).forEach((part, i) => {
+		if (i === 0) {
+			acc = part || sep
+			segs.push({ label: acc, path: acc })
+			return
+		}
+		if (!part) return
+		acc += (acc.endsWith(sep) ? '' : sep) + part
+		segs.push({ label: part, path: acc })
+	})
+	return segs
+}
+
 async function openFolderModal() {
 	const ov = document.createElement('div')
 	ov.className = 'overlay'
@@ -2292,26 +2315,36 @@ async function openFolderModal() {
 		<div class="modal-body">
 			<div class="fb-crumb" id="fbCrumb"></div>
 			<div class="fb-list" id="fbList"></div>
-			<div class="fb-hint">Folders that already contain canvases show a ✓ badge.</div>
+			<div class="fb-hint">Click a folder to select it, ${icon('chevron-right')} or double-click to browse inside. Folders that already contain canvases show a ✓ badge.</div>
 		</div>
 		<div class="modal-foot">
 			<button class="btn ghost" data-close>Cancel</button>
-			<button class="btn primary" id="fbOpen" disabled>Open →</button>
+			<button class="btn primary" id="fbOpen">Open →</button>
 		</div>
 	</div>`
+	const close = () => {
+		ov.remove()
+		document.removeEventListener('keydown', onKey)
+	}
+	function onKey(ev) {
+		if (ev.key === 'Escape') close()
+	}
 	ov.addEventListener('click', (ev) => {
 		if (ev.target === ov || ev.target.closest('[data-close]'))
-			ov.remove()
+			close()
 	})
+	document.addEventListener('keydown', onKey)
 	document.body.appendChild(ov)
 
 	let dir = state.tree ? state.tree.root : ''
 	let parent = null
-	let selected = null
+	let selected = dir
 
+	const crumbEl = ov.querySelector('#fbCrumb')
+	const listEl = ov.querySelector('#fbList')
 	const openBtn = ov.querySelector('#fbOpen')
+
 	openBtn.addEventListener('click', async () => {
-		if (!selected) return
 		openBtn.disabled = true
 		openBtn.textContent = 'Opening…'
 		const { json } = await api('/api/workspace/open', { method: 'POST', body: JSON.stringify({ path: selected }) })
@@ -2320,46 +2353,273 @@ async function openFolderModal() {
 		else {
 			toast('Could not open that folder' + (json && json.error ? `: ${json.error.code}` : '.'))
 			openBtn.disabled = false
-			openBtn.textContent = 'Open →'
+			syncSelection()
 		}
 	})
 
-	async function draw() {
-		const { json } = await api('/api/browse', { method: 'POST', body: JSON.stringify({ dir }) })
-		if (!json || !json.ok) { toast('Cannot list that directory.'); return }
+	/** Reflect `selected` in the row highlight and the Open button, without re-listing. */
+	function syncSelection() {
+		listEl.querySelectorAll('.fb-row[data-path]').forEach((row) => {
+			row.classList.toggle('sel', row.dataset.path === selected)
+		})
+		openBtn.textContent = `Open ${baseName(selected)} →`
+		openBtn.title = selected
+	}
+
+	/** List `target`; only commit it as the current directory once the kernel confirms. */
+	async function navigate(target) {
+		const { json } = await api('/api/browse', { method: 'POST', body: JSON.stringify({ dir: target }) })
+		if (!json || !json.ok) {
+			toast('Cannot list that directory.')
+			return
+		}
 		dir = json.dir
 		parent = json.parent
-		ov.querySelector('#fbCrumb').textContent = dir
-		ov.querySelector('#fbCrumb').title = dir
-		const up = parent ? `<div class="fb-row" data-up>${icon('corner-left-up')} ..</div>` : ''
-		ov.querySelector('#fbList').innerHTML = up + json.entries.map((en) => `
-			<div class="fb-row ${selected === en.path ? 'sel' : ''}" data-path="${esc(en.path)}" data-count="${en.canvasCount}">
-				${icon('folder')} ${esc(en.name)} ${en.canvasCount > 0 ? `<span class="fb-badge">${icon('check')} workspace (${en.canvasCount} canvas${en.canvasCount === 1 ? '' : 'es'})</span>` : ''}
-			</div>`).join('') || (up + '<div class="fb-row fb-none">(no subfolders)</div>')
-		ov.querySelectorAll('.fb-row[data-path]').forEach((row) => {
-			row.addEventListener('click', () => {
-				selected = row.dataset.path
-				openBtn.disabled = false
-				draw()
-			})
-			row.addEventListener('dblclick', () => {
-				dir = row.dataset.path
-				selected = null
-				openBtn.disabled = true
-				draw()
-			})
-		})
-		const upRow = ov.querySelector('[data-up]')
-		if (upRow)
-			upRow.addEventListener('click', () => {
-				dir = parent
-				selected = null
-				openBtn.disabled = true
-				draw()
-			})
+		selected = dir
+		draw(json.entries)
 	}
-	draw()
+
+	function draw(entries) {
+		crumbEl.innerHTML = crumbSegments(dir).map((seg, i, all) => {
+			const cur = i === all.length - 1
+			return `${i ? '<span class="fb-sep">/</span>' : ''}<button type="button" class="fb-seg${cur ? ' cur' : ''}" data-dir="${esc(seg.path)}">${esc(seg.label)}</button>`
+		}).join('')
+		crumbEl.title = dir
+
+		const up = parent ? `<div class="fb-row" data-up>${icon('corner-left-up')} ..</div>` : ''
+		const rows = entries.map((en) => `
+			<div class="fb-row" data-path="${esc(en.path)}">
+				${icon('folder')} <span class="fb-name">${esc(en.name)}</span>
+				${en.canvasCount > 0 ? `<span class="fb-badge">${icon('check')} workspace (${en.canvasCount} canvas${en.canvasCount === 1 ? '' : 'es'})</span>` : ''}
+				<button type="button" class="fb-into" data-into="${esc(en.path)}" title="Browse inside ${esc(en.name)}" aria-label="Browse inside ${esc(en.name)}">${icon('chevron-right')}</button>
+			</div>`).join('')
+		listEl.innerHTML = up + (rows || '<div class="fb-row fb-none">(no subfolders)</div>')
+
+		listEl.querySelectorAll('.fb-row[data-path]').forEach((row) => {
+			row.addEventListener('click', (ev) => {
+				if (ev.target.closest('[data-into]')) return
+				selected = row.dataset.path
+				syncSelection()
+			})
+			row.addEventListener('dblclick', () => navigate(row.dataset.path))
+		})
+		listEl.querySelectorAll('[data-into]').forEach((btn) => {
+			btn.addEventListener('click', () => navigate(btn.dataset.into))
+		})
+		const upRow = listEl.querySelector('[data-up]')
+		if (upRow)
+			upRow.addEventListener('click', () => navigate(parent))
+		crumbEl.querySelectorAll('[data-dir]').forEach((btn) => {
+			btn.addEventListener('click', () => navigate(btn.dataset.dir))
+		})
+		syncSelection()
+	}
+	navigate(dir)
 }
+
+// ---------------------------------------------------------------- canvas search
+//
+// Frosted-glass modal over the workspace tree. The index needs no fetch and no
+// build step: `state.tree` is already in memory because the sidebar renders it,
+// and the kernel pushes a fresh one over the WebSocket whenever the filesystem
+// changes. Filesystem = navigation, so search is just a filter over the scan.
+
+const SEARCH_HINT = 'Search canvases by name, or by the folder that holds them.'
+
+let searchIndex = null
+let searchIndexOf = null // the state.tree this index was derived from
+let searchRows = []
+let searchActive = -1
+let searchLastFocus = null
+
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Flatten the tree into searchable docs, rebuilt only when the tree object changes. */
+function searchDocs() {
+	if (searchIndex && searchIndexOf === state.tree)
+		return searchIndex
+	const tree = state.tree
+	const rootBase = tree ? baseName(tree.root) : ''
+	searchIndex = (tree ? tree.collections : []).flatMap((g) => {
+		// "(root)" is a sentinel, not a folder the reader would ever type.
+		const folder = g.name === '(root)' ? rootBase : g.name
+		return g.canvases.map((c) => ({
+			id: c.id,
+			title: c.title,
+			folder,
+			file: baseName(c.id),
+			interactive: c.interactive,
+			hay: `${c.title} ${folder} ${c.id}`.toLowerCase(),
+		}))
+	})
+	searchIndexOf = tree
+	return searchIndex
+}
+
+/**
+ * Append `text` to `el`, wrapping token matches in <mark>. Nodes, not an HTML
+ * string: there is no escaping step to forget, and no way for a <mark> to land
+ * inside an entity like `&amp;`. `escRe` keeps a query of `c++` from throwing
+ * out of the RegExp constructor.
+ */
+function appendHighlighted(el, text, tokens) {
+	if (!tokens.length) {
+		el.appendChild(document.createTextNode(text))
+		return
+	}
+	const re = new RegExp('(' + tokens.map(escRe).join('|') + ')', 'ig')
+	let last = 0
+	for (let m; (m = re.exec(text));) {
+		if (m.index > last)
+			el.appendChild(document.createTextNode(text.slice(last, m.index)))
+		const mark = document.createElement('mark')
+		mark.textContent = m[0]
+		el.appendChild(mark)
+		last = m.index + m[0].length
+	}
+	if (last < text.length)
+		el.appendChild(document.createTextNode(text.slice(last)))
+}
+
+function setSearchActive(i) {
+	if (!searchRows.length)
+		return
+	searchActive = (i + searchRows.length) % searchRows.length // wraps at both ends
+	searchRows.forEach((row, n) => row.setAttribute('aria-selected', n === searchActive ? 'true' : 'false'))
+	const row = searchRows[searchActive]
+	$('csmInput').setAttribute('aria-activedescendant', row.id)
+	row.scrollIntoView({ block: 'nearest' })
+}
+
+function renderSearch(q) {
+	const input = $('csmInput'), results = $('csmResults'), status = $('csmStatus')
+	const query = q.trim()
+	const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+	searchRows = []
+	searchActive = -1
+	input.removeAttribute('aria-activedescendant')
+	results.textContent = ''
+
+	if (!tokens.length) {
+		results.hidden = true
+		status.hidden = false
+		status.textContent = SEARCH_HINT
+		return
+	}
+
+	// Token-substring, so "rep" finds "report"; every token must hit. Rank by a
+	// title boost, so a name match floats above a folder-only one.
+	const matched = searchDocs()
+		.filter((d) => tokens.every((t) => d.hay.includes(t)))
+		.map((d) => {
+			const title = d.title.toLowerCase()
+			return { d, score: tokens.reduce((s, t) => s + (title.includes(t) ? 1 : 0), 0) }
+		})
+		.sort((a, b) => b.score - a.score)
+
+	if (!matched.length) {
+		results.hidden = true
+		status.hidden = false
+		status.textContent = `No canvas matches “${query}”.` // textContent: "<script>" is shown, never parsed
+		return
+	}
+
+	status.hidden = true
+	results.hidden = false
+	matched.forEach(({ d }, i) => {
+		const row = document.createElement('a')
+		row.className = 'csm-row'
+		row.id = 'csm-row-' + i
+		row.setAttribute('role', 'option')
+		row.setAttribute('aria-selected', 'false')
+		row.href = '#/c/' + encodeURIComponent(d.id)
+		row.dataset.id = d.id
+
+		const title = document.createElement('span')
+		title.className = 'csm-row-title'
+		const name = document.createElement('span')
+		name.className = 'csm-row-name'
+		appendHighlighted(name, d.title, tokens)
+		title.appendChild(name)
+		if (d.interactive) {
+			const tag = document.createElement('span')
+			tag.className = 'csm-row-tag'
+			tag.textContent = 'interactive'
+			title.appendChild(tag)
+		}
+
+		const where = document.createElement('span')
+		where.className = 'csm-row-path'
+		appendHighlighted(where, `${d.folder} / ${d.file}`, tokens)
+
+		row.append(title, where)
+		row.addEventListener('mousemove', () => setSearchActive(i))
+		row.addEventListener('click', () => closeSearch()) // the href does the navigating
+		results.appendChild(row)
+	})
+	searchRows = Array.from(results.querySelectorAll('.csm-row'))
+	setSearchActive(0)
+}
+
+function openSearch() {
+	const modal = $('searchModal')
+	if (!modal.hidden)
+		return
+	// Opened by ⌘K or "/", activeElement is <body> — restoring focus there strands
+	// a keyboard user at the top of the document. Fall back to the trigger.
+	const from = document.activeElement
+	searchLastFocus = from && from !== document.body ? from : $('openSearch')
+	modal.hidden = false
+	document.body.classList.add('modal-open')
+	renderSearch($('csmInput').value)
+	// Focus after paint: focusing synchronously fights the panel's entry animation.
+	requestAnimationFrame(() => $('csmInput').focus())
+}
+
+function closeSearch() {
+	const modal = $('searchModal')
+	if (modal.hidden)
+		return
+	modal.hidden = true
+	document.body.classList.remove('modal-open')
+	$('csmInput').value = ''
+	renderSearch('')
+	if (searchLastFocus && searchLastFocus.focus)
+		searchLastFocus.focus() // never strand a keyboard user at the top of the document
+}
+
+$('openSearch').addEventListener('click', openSearch)
+$('csmInput').addEventListener('input', () => renderSearch($('csmInput').value))
+$('searchModal').querySelectorAll('[data-csm-close]').forEach((el) => el.addEventListener('click', closeSearch))
+
+$('csmInput').addEventListener('keydown', (e) => {
+	if (e.key === 'ArrowDown') { e.preventDefault(); setSearchActive(searchActive + 1) }
+	else if (e.key === 'ArrowUp') { e.preventDefault(); setSearchActive(searchActive - 1) }
+	else if (e.key === 'Enter' && searchRows[searchActive]) {
+		e.preventDefault()
+		const id = searchRows[searchActive].dataset.id
+		closeSearch()
+		location.hash = '#/c/' + encodeURIComponent(id)
+	}
+})
+
+// ⌘K works from anywhere, including inside a form field; "/" must not hijack a
+// keystroke meant for an input, so it only fires from the page body.
+document.addEventListener('keydown', (e) => {
+	const modal = $('searchModal')
+	const tag = (e.target && e.target.tagName) || ''
+	const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (e.target && e.target.isContentEditable)
+	if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+		e.preventDefault()
+		modal.hidden ? openSearch() : closeSearch()
+	} else if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+		e.preventDefault()
+		openSearch()
+	} else if (e.key === 'Escape' && !modal.hidden) {
+		e.preventDefault()
+		closeSearch()
+	}
+})
 
 // ---------------------------------------------------------------- stop kernel
 

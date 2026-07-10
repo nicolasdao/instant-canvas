@@ -58,9 +58,23 @@ A two-dimension `splom` (broken, see below) mounted beside a `violin` killed the
 
 A NUL byte inside a template-literal key separator makes the whole file `data` to `file(1)`, and `grep` silently reports nothing rather than matching — which reads exactly like "the code isn't there." Use `JSON.stringify([a, b])` for composite map keys.
 
-## Re-rendering a popover detaches the clicked element
+## Re-rendering on click detaches the element that was clicked
 
 The date picker's arrows re-render its DOM. The click then bubbles to the document-level "close on outside click" listener with a **detached** target — `target.closest('.dp')` fails, and the picker closes itself. Any widget that re-renders on click inside a popover must `stopPropagation()` before re-rendering (date picker and select menu both do).
+
+The folder browser hit the same trap from the other direction, and it cost the feature entirely. Selecting a row called `draw()`, which re-listed the whole `.fb-list`; the row you clicked was replaced mid-gesture. Descending was double-click-only, and a `dblclick` **only fires on the common ancestor of both clicks' targets** — so the second click, landing on a freshly created row, never delivered `dblclick` to any row at all. The modal listed the root's subfolders and refused to go anywhere, with no error. Rule: **selection is a class toggle, never a re-render**; re-list only when the directory actually changes. Never make a re-rendering row the sole carrier of a multi-click gesture, and give any "descend" action its own single-click affordance (`.fb-into`) — a hidden double-click is not discoverable for a user who did not choose this tool. `scripts/test/browse.test.js` pins this by asserting the clicked node is still `isConnected` after a select.
+
+## Highlighting search matches by string-building is two bugs, not one
+
+Wrapping matched terms in `<mark>` inside an HTML string needs the text escaped **first** and the marks injected **after** — and even then, a query of `amp` highlights the `amp` inside the `&amp;` of a canvas titled `Tom & Jerry`, rendering visible garbage. Separately, the query goes straight into a `RegExp`, so `c++` throws an unhandled `SyntaxError` unless every metacharacter is escaped. Both are silent until someone types the wrong thing. `appendHighlighted()` sidesteps the entire class by appending **text nodes and `<mark>` elements** instead of concatenating markup; only the regex-metacharacter escape (`escRe`) is still needed. The no-results message is set with `textContent`, so a query of `<script>` is shown, never parsed. `scripts/test/search.test.js` pins both.
+
+## A modal opened by keyboard has nowhere to restore focus to
+
+`searchLastFocus = document.activeElement` is right when the reader *clicked* the trigger, and wrong for every keyboard path: `⌘K` and `/` fire with `document.body` focused, so closing hands focus back to `<body>` and strands the keyboard user at the top of the document. Fall back to the trigger element whenever the captured node is missing or is `body`. The browser test caught this because a programmatic `.click()` does not focus a button either — the same blind spot, from the other side.
+
+## Body scroll lock does nothing here
+
+The frosted-glass recipe says `document.body.style.overflow = 'hidden'` on open. In this app `.app` is `height:100vh` and `.main` is the only scroller, so that line is a no-op — the page behind the modal keeps scrolling. Lock the real scroller instead: a `body.modal-open` class plus `body.modal-open .main{overflow:hidden}` (class-based, because CSP drops `style=""` attributes and JS-set `el.style` on `body` would not reach `.main` anyway).
 
 ## Native widget chrome ignores your dark theme
 

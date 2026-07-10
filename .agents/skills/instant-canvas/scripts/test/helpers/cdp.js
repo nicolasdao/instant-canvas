@@ -177,7 +177,9 @@ async function withChrome(chromePath, url, { onNewDocument = '', timeoutMs = 30_
 				throw new Error(r.exceptionDetails.exception?.description || 'evaluate threw')
 			return r.result.value
 		}
-		return await fn({ evaluate, sleep })
+		// `send` is the raw DevTools channel — Page.captureScreenshot and friends.
+		const send = (method, params) => client.send(method, params)
+		return await fn({ evaluate, send, sleep })
 	} finally {
 		if (client) client.close()
 		child.kill('SIGKILL')

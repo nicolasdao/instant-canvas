@@ -19,6 +19,14 @@ It is the tempting way to inspect a rendered page without a WebSocket client, an
 
 Chrome echoes the request's `Host` back when it builds `webSocketDebuggerUrl`. Send `Host: localhost` and you get `ws://localhost/devtools/page/…` — no port — which then connects to port 80 and fails with `ECONNREFUSED`. Omit the header, and trust only the URL's *path*: rebuild host and port from the port you discovered in `DevToolsActivePort`.
 
+## Waiting for an element does not mean the app is listening
+
+The topbar and sidebar ship in the static `index.html`, so `#openSearch` and `#openFolder` exist from the first paint — long before `app.js` runs and attaches their click handlers. A browser test that polls for the *element* and then clicks it clicks into the void: the handler is not bound yet, nothing opens, and the failure surfaces much later as a timeout on some unrelated step. Poll for the app instead — `window.ic && window.ic.state.tree` — which only exists once `app.js` has booted. Both `browse.test.js` and `search.test.js` do.
+
+## A throwing `waitFor` in a `before` hook reports the wrong failure
+
+When one driving step never happens, a helper that throws sinks the whole `test.before` hook, and *every* top-level test in the file then fails with the same "timed out waiting for X" — including the ones that had nothing to do with X. The first run of `browse.test.js` reported five failures for one broken step, and none of the messages named the real defect. Make the poll return `false` on timeout (`until()`), record it in the snapshot, and let one assertion fail with a real message. Reserve throwing for genuine environment failures, like the app never booting.
+
 ## A new test that cannot fail is worse than no test
 
 The render smoke test was written, passed, and proved nothing until the bug it targets was deliberately reintroduced. It did not fail. That is how the real cause (the 2-dimension `splom`, not `newPlot` re-entrancy) was found. Before trusting any regression test, break the thing it guards and watch it go red.
